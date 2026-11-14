@@ -317,4 +317,147 @@ void main() {
     expect(libraryRepository.items.single.name, 'Band Pull Apart');
     expect(libraryRepository.items.single.muscleGroup, 'Other');
   });
+
+  testWidgets('opens personal records from workout history', (tester) async {
+    await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 13),
+        exercises: [
+          Exercise(
+            name: 'Shoulder Press',
+            sets: [WorkoutSet(weight: 25, reps: 8)],
+          ),
+        ],
+      ),
+    );
+    await pumpWorkoutPage(tester);
+
+    await tester.tap(find.byKey(const ValueKey('open-personal-records')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personal Records'), findsOneWidget);
+    expect(find.text('Shoulder Press'), findsOneWidget);
+    expect(find.text('25 kg × 8 reps'), findsOneWidget);
+  });
+
+  testWidgets('shows live PRs only when a new set beats saved records', (
+    tester,
+  ) async {
+    await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 13),
+        exercises: [
+          Exercise(
+            name: 'Bench Press',
+            sets: [WorkoutSet(weight: 100, reps: 5)],
+          ),
+        ],
+      ),
+    );
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-exercise')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('exercise-name-input')),
+      'bench press',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-add-exercise')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('New PR'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('add-set-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('set-weight-0-0')), '105');
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('set-reps-0-0')), '4');
+    await tester.pump();
+
+    expect(find.text('New PR · Heaviest set: 105 kg × 4 reps'), findsOneWidget);
+    expect(find.textContaining('Most reps'), findsNothing);
+  });
+
+  testWidgets('zero-weight sets can create reps PRs with weight context', (
+    tester,
+  ) async {
+    await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 13),
+        exercises: [
+          Exercise(name: 'Sit Up', sets: [WorkoutSet(weight: 0, reps: 12)]),
+        ],
+      ),
+    );
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-exercise')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('exercise-name-input')),
+      'Sit Up',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-set-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('set-reps-0-0')), '13');
+    await tester.pump();
+
+    expect(find.text('New PR · Most reps: 13 reps at 0 kg'), findsOneWidget);
+  });
+
+  testWidgets(
+    'viewing shows no new PR and edit baseline excludes that workout',
+    (tester) async {
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 10),
+          exercises: [
+            Exercise(name: 'Deadlift', sets: [WorkoutSet(weight: 80, reps: 5)]),
+          ],
+        ),
+      );
+      final recordWorkoutId = await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 12),
+          exercises: [
+            Exercise(
+              name: 'Deadlift',
+              sets: [WorkoutSet(weight: 100, reps: 3)],
+            ),
+          ],
+        ),
+      );
+      await pumpWorkoutPage(tester);
+      await tester.tap(find.byKey(ValueKey('workout-$recordWorkoutId')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('New PR'), findsNothing);
+      final editButton = find.byKey(const ValueKey('edit-workout'));
+      await tester.drag(find.byType(ListView), const Offset(0, -1000));
+      await tester.pumpAndSettle();
+      await tester.tap(editButton);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('New PR'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('set-weight-0-0')),
+        '90',
+      );
+      await tester.pump();
+
+      // 90 kg is a PR over the other saved workout's 80 kg. It would not be
+      // detected if the workout being edited remained in the baseline (100 kg).
+      expect(
+        find.text('New PR · Heaviest set: 90 kg × 3 reps'),
+        findsOneWidget,
+      );
+    },
+  );
 }

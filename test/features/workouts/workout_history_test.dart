@@ -54,6 +54,7 @@ void main() {
             workouts: workouts,
             onOpenWorkout: onOpenWorkout ?? (_) {},
             onCreateWorkout: () {},
+            onOpenPersonalRecords: () {},
           ),
         ),
       ),

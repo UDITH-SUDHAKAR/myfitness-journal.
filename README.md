@@ -116,7 +116,7 @@ lib/
 - [x] Exercise library
 - [ ] Workout logging
 - [x] Workout history
-- [ ] Personal records
+- [x] Personal records
 - [ ] Dashboard improvements
 - [ ] Nutrition tracking
 - [ ] Body weight tracking
