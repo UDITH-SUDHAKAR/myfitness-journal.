@@ -19,6 +19,7 @@ Widget buildDashboard({
   bool isNutritionLoading = false,
   bool nutritionLoadError = false,
   VoidCallback? onWorkout,
+  VoidCallback? onStatistics,
   VoidCallback? onMeals,
   VoidCallback? onWeight,
 }) {
@@ -36,6 +37,7 @@ Widget buildDashboard({
         isNutritionLoading: isNutritionLoading,
         nutritionLoadError: nutritionLoadError,
         onOpenWorkout: onWorkout ?? () {},
+        onOpenStatistics: onStatistics ?? () {},
         onOpenMeals: onMeals ?? () {},
         onOpenWeight: onWeight ?? () {},
       ),
@@ -190,11 +192,13 @@ void main() {
     tester,
   ) async {
     var workoutOpened = false;
+    var statisticsOpened = false;
     var mealsOpened = false;
     var weightOpened = false;
     await tester.pumpWidget(
       buildDashboard(
         onWorkout: () => workoutOpened = true,
+        onStatistics: () => statisticsOpened = true,
         onMeals: () => mealsOpened = true,
         onWeight: () => weightOpened = true,
       ),
@@ -210,6 +214,8 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('dashboard-open-workout')));
     expect(workoutOpened, isTrue);
+    await tester.tap(find.byKey(const ValueKey('dashboard-open-statistics')));
+    expect(statisticsOpened, isTrue);
     await tester.tap(find.byKey(const ValueKey('dashboard-open-meals')));
     expect(mealsOpened, isTrue);
     await tester.tap(find.byKey(const ValueKey('dashboard-open-weight')));

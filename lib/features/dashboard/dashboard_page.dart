@@ -22,6 +22,7 @@ class DashboardPage extends StatelessWidget {
     required this.isNutritionLoading,
     required this.nutritionLoadError,
     required this.onOpenWorkout,
+    required this.onOpenStatistics,
     required this.onOpenMeals,
     required this.onOpenWeight,
     super.key,
@@ -38,6 +39,7 @@ class DashboardPage extends StatelessWidget {
   final bool isNutritionLoading;
   final bool nutritionLoadError;
   final VoidCallback onOpenWorkout;
+  final VoidCallback onOpenStatistics;
   final VoidCallback onOpenMeals;
   final VoidCallback onOpenWeight;
 
@@ -343,6 +345,12 @@ class DashboardPage extends StatelessWidget {
                 onPressed: onOpenMeals,
                 icon: const Icon(Icons.restaurant),
                 label: const Text('Meals'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('dashboard-open-statistics'),
+                onPressed: onOpenStatistics,
+                icon: const Icon(Icons.query_stats),
+                label: const Text('Statistics'),
               ),
             ],
           ),
