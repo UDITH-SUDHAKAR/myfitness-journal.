@@ -5,6 +5,8 @@ import '../models/workout.dart';
 import '../models/exercise_library_item.dart';
 import '../models/body_weight_entry.dart';
 import '../models/nutrition_entry.dart';
+import '../models/food.dart';
+import '../models/meal.dart';
 
 /// Opens and provides the app's Isar database instance.
 class IsarService {
@@ -36,6 +38,8 @@ class IsarService {
       ExerciseLibraryItemSchema,
       BodyWeightEntrySchema,
       NutritionEntrySchema,
+      FoodSchema,
+      MealSchema,
     ], directory: directory.path);
     return _database!;
   }
