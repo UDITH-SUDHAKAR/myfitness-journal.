@@ -7,6 +7,7 @@ import 'core/storage/isar_workout_repository.dart';
 import 'core/storage/workout_repository.dart';
 import 'core/storage/exercise_library_repository.dart';
 import 'core/storage/isar_exercise_library_repository.dart';
+import 'features/dashboard/dashboard_page.dart';
 import 'features/workouts/workout_page.dart';
 
 Future<void> main() async {
@@ -83,9 +84,14 @@ class _JournalHomeState extends State<JournalHome> {
   DateTime selectedDate = DateTime.now();
   final Map<String, double> weights = {};
   List<Workout> savedWorkouts = [];
+  WorkoutLoadStatus? workoutLoadStatus;
 
   void _workoutsChanged(List<Workout> workouts) {
     setState(() => savedWorkouts = workouts);
+  }
+
+  void _workoutLoadStatusChanged(WorkoutLoadStatus status) {
+    setState(() => workoutLoadStatus = status);
   }
 
   String get dateKey => DateFormat('yyyy-MM-dd').format(selectedDate);
@@ -109,46 +115,15 @@ class _JournalHomeState extends State<JournalHome> {
     child: Padding(padding: const EdgeInsets.all(16), child: child),
   );
 
-  Widget homePage() => ListView(
-    padding: const EdgeInsets.all(12),
-    children: [
-      card(
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Welcome back',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('Your fitness journey starts here.'),
-          ],
-        ),
-      ),
-      card(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Today',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text('$exerciseCountForSelectedDate exercises logged'),
-            Text(
-              weights[dateKey] == null
-                  ? 'Weight not recorded'
-                  : '${weights[dateKey]} kg',
-            ),
-          ],
-        ),
-      ),
-    ],
+  Widget homePage() => DashboardPage(
+    workouts: savedWorkouts,
+    selectedDate: selectedDate,
+    isLoading: workoutLoadStatus == null,
+    hasLoadError: workoutLoadStatus == WorkoutLoadStatus.failed,
+    selectedDateWeight: weights[dateKey],
+    onOpenWorkout: () => setState(() => selectedTab = 1),
+    onOpenWeight: () => setState(() => selectedTab = 3),
   );
-
-  int get exerciseCountForSelectedDate => savedWorkouts
-      .where((workout) => DateUtils.isSameDay(workout.date, selectedDate))
-      .fold(0, (total, workout) => total + workout.exercises.length);
 
   Widget mealsPage() => ListView(
     padding: const EdgeInsets.all(12),
@@ -221,6 +196,7 @@ class _JournalHomeState extends State<JournalHome> {
         exerciseLibraryRepository: widget.exerciseLibraryRepository,
         selectedDate: selectedDate,
         onWorkoutsChanged: _workoutsChanged,
+        onLoadStatusChanged: _workoutLoadStatusChanged,
       ),
       mealsPage(),
       weightPage(),
