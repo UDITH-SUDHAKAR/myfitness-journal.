@@ -17,6 +17,7 @@ import 'features/dashboard/dashboard_page.dart';
 import 'features/nutrition/nutrition_page.dart';
 import 'features/progress/weight_page.dart';
 import 'features/workouts/workout_page.dart';
+import 'features/workouts/workout_statistics_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -182,9 +183,19 @@ class _JournalHomeState extends State<JournalHome> {
     isNutritionLoading: nutritionIsLoading,
     nutritionLoadError: nutritionLoadError,
     onOpenWorkout: () => setState(() => selectedTab = 1),
+    onOpenStatistics: _openWorkoutStatistics,
     onOpenMeals: () => setState(() => selectedTab = 2),
     onOpenWeight: () => setState(() => selectedTab = 3),
   );
+
+  void _openWorkoutStatistics() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            WorkoutStatisticsPage(repository: widget.workoutRepository),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

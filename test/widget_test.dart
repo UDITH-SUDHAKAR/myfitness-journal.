@@ -112,6 +112,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('dashboard-open-meals')));
       await tester.pumpAndSettle();
       expect(find.text('Add food or meal'), findsOneWidget);
+
+      await tester.tap(find.text('Home').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('dashboard-open-statistics')),
+      );
+      await tester.tap(find.byKey(const ValueKey('dashboard-open-statistics')));
+      await tester.pumpAndSettle();
+      expect(find.text('Workout Statistics'), findsOneWidget);
+      expect(find.text('Personal Records'), findsNothing);
     },
   );
 }
