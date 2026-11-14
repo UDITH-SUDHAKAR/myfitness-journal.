@@ -24,7 +24,7 @@ void main() {
     expect(find.text('Myfitness Journal'), findsOneWidget);
     expect(find.text('Your fitness journey starts here.'), findsOneWidget);
 
-    await tester.tap(find.text('Workout'));
+    await tester.tap(find.text('Workout').last);
     await tester.pumpAndSettle();
     expect(find.text('Workout history'), findsOneWidget);
     expect(find.text('Start workout'), findsOneWidget);
@@ -33,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nutrition tracking is coming next.'), findsOneWidget);
 
-    await tester.tap(find.text('Weight'));
+    await tester.tap(find.text('Weight').last);
     await tester.pumpAndSettle();
     expect(find.text('Daily weight (kg)'), findsOneWidget);
   });

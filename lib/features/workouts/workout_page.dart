@@ -11,6 +11,9 @@ import 'personal_records_page.dart';
 
 enum _EditorMode { creating, viewing, editing }
 
+/// Indicates whether the saved workout list has loaded successfully.
+enum WorkoutLoadStatus { loaded, failed }
+
 /// Connects workout creation and history to the local workout repository.
 class WorkoutPage extends StatefulWidget {
   /// Creates the workout page using the app's repository.
@@ -19,6 +22,7 @@ class WorkoutPage extends StatefulWidget {
     required this.exerciseLibraryRepository,
     required this.selectedDate,
     required this.onWorkoutsChanged,
+    this.onLoadStatusChanged,
     super.key,
   });
 
@@ -33,6 +37,9 @@ class WorkoutPage extends StatefulWidget {
 
   /// Lets the home screen refresh its workout summary.
   final ValueChanged<List<Workout>> onWorkoutsChanged;
+
+  /// Reports when the initial workout load finishes or fails.
+  final ValueChanged<WorkoutLoadStatus>? onLoadStatusChanged;
 
   @override
   State<WorkoutPage> createState() => _WorkoutPageState();
@@ -63,12 +70,14 @@ class _WorkoutPageState extends State<WorkoutPage> {
         _loadError = null;
       });
       widget.onWorkoutsChanged(List<Workout>.unmodifiable(workouts));
+      widget.onLoadStatusChanged?.call(WorkoutLoadStatus.loaded);
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _loadError = error.toString();
       });
+      widget.onLoadStatusChanged?.call(WorkoutLoadStatus.failed);
     }
   }
 
