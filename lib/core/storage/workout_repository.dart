@@ -1,46 +1,22 @@
-import 'package:isar_community/isar.dart';
-
 import '../models/workout.dart';
 
-/// Reads and writes workouts in the Isar database.
-class WorkoutRepository {
-  /// Creates a repository that uses the provided Isar database.
-  WorkoutRepository(this._isar);
-
-  final Isar _isar;
-
-  /// Saves a new workout and returns its unique database ID.
-  Future<Id> save(Workout workout) async {
-    return _isar.writeTxn(() => _isar.workouts.put(workout));
-  }
+/// The operations the UI needs for loading and saving workouts.
+///
+/// Keeping this small interface separate lets widget tests use a simple fake
+/// repository without starting the native database.
+abstract interface class WorkoutRepository {
+  /// Saves a new workout and returns its unique ID.
+  Future<int> save(Workout workout);
 
   /// Returns all saved workouts.
-  Future<List<Workout>> getAll() {
-    return _isar.workouts.where().findAll();
-  }
+  Future<List<Workout>> getAll();
 
   /// Returns the workout with [id], or `null` if it does not exist.
-  Future<Workout?> getById(Id id) {
-    return _isar.workouts.get(id);
-  }
+  Future<Workout?> getById(int id);
 
-  /// Replaces an existing workout and its embedded exercises and sets.
-  ///
-  /// Returns `false` when no workout with the same ID exists.
-  Future<bool> update(Workout workout) async {
-    return _isar.writeTxn(() async {
-      final existingWorkout = await _isar.workouts.get(workout.id);
-      if (existingWorkout == null) {
-        return false;
-      }
+  /// Replaces an existing workout. Returns `false` if it was not found.
+  Future<bool> update(Workout workout);
 
-      await _isar.workouts.put(workout);
-      return true;
-    });
-  }
-
-  /// Deletes the workout with [id]. Returns `false` if it was not found.
-  Future<bool> delete(Id id) {
-    return _isar.writeTxn(() => _isar.workouts.delete(id));
-  }
+  /// Deletes a workout. Returns `false` if it was not found.
+  Future<bool> delete(int id);
 }

@@ -1,12 +1,21 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'core/models/workout.dart';
 import 'core/storage/isar_service.dart';
+import 'core/storage/isar_workout_repository.dart';
+import 'core/storage/workout_repository.dart';
+import 'features/workouts/workout_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await IsarService.instance.initialize();
-  runApp(const MyFitnessApp());
+  runApp(
+    MyFitnessApp(
+      workoutRepository:
+          IsarWorkoutRepository(IsarService.instance.database),
+    ),
+  );
 }
 
 const teal = Color(0xFF20B8A9);
@@ -14,7 +23,10 @@ const background = Color(0xFF181C20);
 const surface = Color(0xFF262B30);
 
 class MyFitnessApp extends StatelessWidget {
-  const MyFitnessApp({super.key});
+  const MyFitnessApp({required this.workoutRepository, super.key});
+
+  /// Repository shared by the workout UI.
+  final WorkoutRepository workoutRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +42,16 @@ class MyFitnessApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const JournalHome(),
+      home: JournalHome(workoutRepository: workoutRepository),
     );
   }
 }
 
 class JournalHome extends StatefulWidget {
-  const JournalHome({super.key});
+  const JournalHome({required this.workoutRepository, super.key});
+
+  /// Provides saved workout data to the workout tab.
+  final WorkoutRepository workoutRepository;
 
   @override
   State<JournalHome> createState() => _JournalHomeState();
@@ -45,50 +60,27 @@ class JournalHome extends StatefulWidget {
 class _JournalHomeState extends State<JournalHome> {
   int selectedTab = 0;
   DateTime selectedDate = DateTime.now();
-  final Map<String, List<String>> workouts = {};
   final Map<String, double> weights = {};
+  List<Workout> savedWorkouts = [];
+
+  void _workoutsChanged(List<Workout> workouts) {
+    setState(() => savedWorkouts = workouts);
+  }
 
   String get dateKey => DateFormat('yyyy-MM-dd').format(selectedDate);
-
-  List<String> get selectedWorkout =>
-      workouts.putIfAbsent(dateKey, () => <String>[]);
 
   void moveDate(int days) {
     setState(() => selectedDate = selectedDate.add(Duration(days: days)));
   }
 
-  void addExercise() {
-    final controller = TextEditingController();
-
-    showDialog<void>(
+  Future<void> selectDate() async {
+    final date = await showDatePicker(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Add exercise'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Incline dumbbell press',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final exercise = controller.text.trim();
-              if (exercise.isNotEmpty) {
-                setState(() => selectedWorkout.add(exercise));
-              }
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      initialDate: selectedDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
+    if (date != null) setState(() => selectedDate = date);
   }
 
   Widget card(Widget child) => Card(
@@ -117,7 +109,7 @@ class _JournalHomeState extends State<JournalHome> {
               const Text('Today',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('${selectedWorkout.length} exercises logged'),
+              Text('$exerciseCountForSelectedDate exercises logged'),
               Text(weights[dateKey] == null
                   ? 'Weight not recorded'
                   : '${weights[dateKey]} kg'),
@@ -126,39 +118,9 @@ class _JournalHomeState extends State<JournalHome> {
         ],
       );
 
-  Widget workoutPage() => ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          card(Row(
-            children: [
-              Expanded(
-                child: Text(DateFormat('EEE, d MMM').format(selectedDate)),
-              ),
-              IconButton(
-                onPressed: addExercise,
-                icon: const Icon(Icons.add_circle, color: teal),
-              ),
-            ],
-          )),
-          ...selectedWorkout.map((exercise) => card(Row(
-                children: [
-                  const Icon(Icons.fitness_center, color: teal),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(exercise)),
-                  IconButton(
-                    onPressed: () =>
-                        setState(() => selectedWorkout.remove(exercise)),
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-                ],
-              ))),
-          FilledButton.icon(
-            onPressed: addExercise,
-            icon: const Icon(Icons.add),
-            label: const Text('Add exercise'),
-          ),
-        ],
-      );
+  int get exerciseCountForSelectedDate => savedWorkouts
+      .where((workout) => DateUtils.isSameDay(workout.date, selectedDate))
+      .fold(0, (total, workout) => total + workout.exercises.length);
 
   Widget mealsPage() => ListView(
         padding: const EdgeInsets.all(12),
@@ -210,7 +172,16 @@ class _JournalHomeState extends State<JournalHome> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [homePage(), workoutPage(), mealsPage(), weightPage()];
+    final pages = [
+      homePage(),
+      WorkoutPage(
+        repository: widget.workoutRepository,
+        selectedDate: selectedDate,
+        onWorkoutsChanged: _workoutsChanged,
+      ),
+      mealsPage(),
+      weightPage(),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -229,14 +200,26 @@ class _JournalHomeState extends State<JournalHome> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              DateFormat('EEEE, d MMMM yyyy').format(selectedDate),
-              style: const TextStyle(color: teal),
+          InkWell(
+            onTap: selectDate,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    DateFormat('EEEE, d MMMM yyyy').format(selectedDate),
+                    style: const TextStyle(color: teal),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.calendar_month, size: 18, color: teal),
+                ],
+              ),
             ),
           ),
-          Expanded(child: pages[selectedTab]),
+          Expanded(
+            child: IndexedStack(index: selectedTab, children: pages),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
