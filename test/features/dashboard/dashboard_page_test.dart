@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
+import 'package:myfitness_journal/core/models/body_weight_entry.dart';
+import 'package:myfitness_journal/core/models/nutrition_entry.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/features/dashboard/dashboard_page.dart';
 
@@ -10,8 +12,14 @@ Widget buildDashboard({
   DateTime? selectedDate,
   bool isLoading = false,
   bool hasLoadError = false,
-  double? weight,
+  List<BodyWeightEntry> bodyWeightEntries = const [],
+  bool isBodyWeightLoading = false,
+  bool bodyWeightLoadError = false,
+  List<NutritionEntry> nutritionEntries = const [],
+  bool isNutritionLoading = false,
+  bool nutritionLoadError = false,
   VoidCallback? onWorkout,
+  VoidCallback? onMeals,
   VoidCallback? onWeight,
 }) {
   return MaterialApp(
@@ -21,8 +29,14 @@ Widget buildDashboard({
         selectedDate: selectedDate ?? DateTime.now(),
         isLoading: isLoading,
         hasLoadError: hasLoadError,
-        selectedDateWeight: weight,
+        bodyWeightEntries: bodyWeightEntries,
+        isBodyWeightLoading: isBodyWeightLoading,
+        bodyWeightLoadError: bodyWeightLoadError,
+        nutritionEntries: nutritionEntries,
+        isNutritionLoading: isNutritionLoading,
+        nutritionLoadError: nutritionLoadError,
         onOpenWorkout: onWorkout ?? () {},
+        onOpenMeals: onMeals ?? () {},
         onOpenWeight: onWeight ?? () {},
       ),
     ),
@@ -39,7 +53,36 @@ void main() {
 
     await tester.pumpWidget(buildDashboard());
     expect(find.text('No workouts logged for this day.'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const ValueKey('dashboard-list')),
+      const Offset(0, -1200),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard-empty-recent')),
+    );
     expect(find.text('Your saved workouts will appear here.'), findsOneWidget);
+  });
+
+  testWidgets('shows load errors separately from empty data', (tester) async {
+    await tester.pumpWidget(
+      buildDashboard(
+        hasLoadError: true,
+        bodyWeightLoadError: true,
+        nutritionLoadError: true,
+      ),
+    );
+
+    expect(find.text('Workout activity could not be loaded.'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const ValueKey('dashboard-list')),
+      const Offset(0, -1200),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Weight history could not be loaded.'), findsOneWidget);
+    expect(find.text('Nutrition entries could not be loaded.'), findsOneWidget);
+    expect(find.text('No weight entries yet.'), findsNothing);
+    expect(find.text('No nutrition entries for this day.'), findsNothing);
   });
 
   testWidgets('shows selected-day totals and weight using calendar dates', (
@@ -64,13 +107,35 @@ void main() {
       buildDashboard(
         workouts: workouts,
         selectedDate: selectedDay,
-        weight: 72.5,
+        bodyWeightEntries: [
+          BodyWeightEntry(date: DateTime(2026, 11, 12), weightKg: 72.5),
+        ],
+        nutritionEntries: [
+          NutritionEntry(
+            date: DateTime(2026, 11, 12, 12),
+            name: 'Lunch',
+            calories: 650,
+            proteinGrams: 35,
+          ),
+        ],
       ),
     );
 
     expect(find.text('2 exercises logged'), findsOneWidget);
     expect(find.text('1 workout session'), findsOneWidget);
-    expect(find.text('Weight: 72.5 kg'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const ValueKey('dashboard-list')),
+      const Offset(0, -1200),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard-latest-weight')),
+    );
+    expect(find.text('72.5 kg · 12 Nov 2026'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard-daily-nutrition')),
+    );
+    expect(find.text('650 kcal · 35.0 g protein'), findsOneWidget);
   });
 
   testWidgets('counts sessions Monday through Sunday and shows three newest', (
@@ -95,7 +160,12 @@ void main() {
       buildDashboard(workouts: workouts, selectedDate: monday),
     );
 
-    expect(find.text('4'), findsOneWidget);
+    expect(
+      (tester.widget(find.byKey(const ValueKey('dashboard-weekly-count')))
+              as Text)
+          .data,
+      '4',
+    );
     expect(find.text('1 exercise logged'), findsOneWidget);
     await tester.drag(
       find.byKey(const ValueKey('dashboard-list')),
@@ -120,16 +190,28 @@ void main() {
     tester,
   ) async {
     var workoutOpened = false;
+    var mealsOpened = false;
     var weightOpened = false;
     await tester.pumpWidget(
       buildDashboard(
         onWorkout: () => workoutOpened = true,
+        onMeals: () => mealsOpened = true,
         onWeight: () => weightOpened = true,
       ),
     );
 
+    await tester.drag(
+      find.byKey(const ValueKey('dashboard-list')),
+      const Offset(0, -1400),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard-open-workout')),
+    );
     await tester.tap(find.byKey(const ValueKey('dashboard-open-workout')));
     expect(workoutOpened, isTrue);
+    await tester.tap(find.byKey(const ValueKey('dashboard-open-meals')));
+    expect(mealsOpened, isTrue);
     await tester.tap(find.byKey(const ValueKey('dashboard-open-weight')));
     expect(weightOpened, isTrue);
   });

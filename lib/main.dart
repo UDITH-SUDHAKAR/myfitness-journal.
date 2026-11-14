@@ -2,12 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'core/models/workout.dart';
+import 'core/models/body_weight_entry.dart';
+import 'core/models/nutrition_entry.dart';
 import 'core/storage/isar_service.dart';
 import 'core/storage/isar_workout_repository.dart';
 import 'core/storage/workout_repository.dart';
 import 'core/storage/exercise_library_repository.dart';
 import 'core/storage/isar_exercise_library_repository.dart';
+import 'core/storage/body_weight_repository.dart';
+import 'core/storage/isar_body_weight_repository.dart';
+import 'core/storage/nutrition_repository.dart';
+import 'core/storage/isar_nutrition_repository.dart';
 import 'features/dashboard/dashboard_page.dart';
+import 'features/nutrition/nutrition_page.dart';
+import 'features/progress/weight_page.dart';
 import 'features/workouts/workout_page.dart';
 
 Future<void> main() async {
@@ -19,18 +27,25 @@ Future<void> main() async {
       exerciseLibraryRepository: IsarExerciseLibraryRepository(
         IsarService.instance.database,
       ),
+      bodyWeightRepository: IsarBodyWeightRepository(
+        IsarService.instance.database,
+      ),
+      nutritionRepository: IsarNutritionRepository(
+        IsarService.instance.database,
+      ),
     ),
   );
 }
 
 const teal = Color(0xFF20B8A9);
 const background = Color(0xFF181C20);
-const surface = Color(0xFF262B30);
 
 class MyFitnessApp extends StatelessWidget {
   const MyFitnessApp({
     required this.workoutRepository,
     required this.exerciseLibraryRepository,
+    required this.bodyWeightRepository,
+    required this.nutritionRepository,
     super.key,
   });
 
@@ -39,6 +54,12 @@ class MyFitnessApp extends StatelessWidget {
 
   /// Repository shared by the exercise library and workout editor.
   final ExerciseLibraryRepository exerciseLibraryRepository;
+
+  /// Stores daily body-weight entries.
+  final BodyWeightRepository bodyWeightRepository;
+
+  /// Stores food and meal nutrition entries.
+  final NutritionRepository nutritionRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +78,8 @@ class MyFitnessApp extends StatelessWidget {
       home: JournalHome(
         workoutRepository: workoutRepository,
         exerciseLibraryRepository: exerciseLibraryRepository,
+        bodyWeightRepository: bodyWeightRepository,
+        nutritionRepository: nutritionRepository,
       ),
     );
   }
@@ -66,6 +89,8 @@ class JournalHome extends StatefulWidget {
   const JournalHome({
     required this.workoutRepository,
     required this.exerciseLibraryRepository,
+    required this.bodyWeightRepository,
+    required this.nutritionRepository,
     super.key,
   });
 
@@ -74,6 +99,8 @@ class JournalHome extends StatefulWidget {
 
   /// Provides local exercise library data.
   final ExerciseLibraryRepository exerciseLibraryRepository;
+  final BodyWeightRepository bodyWeightRepository;
+  final NutritionRepository nutritionRepository;
 
   @override
   State<JournalHome> createState() => _JournalHomeState();
@@ -82,9 +109,14 @@ class JournalHome extends StatefulWidget {
 class _JournalHomeState extends State<JournalHome> {
   int selectedTab = 0;
   DateTime selectedDate = DateTime.now();
-  final Map<String, double> weights = {};
   List<Workout> savedWorkouts = [];
   WorkoutLoadStatus? workoutLoadStatus;
+  List<BodyWeightEntry> bodyWeightEntries = [];
+  bool bodyWeightIsLoading = true;
+  bool bodyWeightLoadError = false;
+  List<NutritionEntry> nutritionEntries = [];
+  bool nutritionIsLoading = true;
+  bool nutritionLoadError = false;
 
   void _workoutsChanged(List<Workout> workouts) {
     setState(() => savedWorkouts = workouts);
@@ -94,7 +126,35 @@ class _JournalHomeState extends State<JournalHome> {
     setState(() => workoutLoadStatus = status);
   }
 
-  String get dateKey => DateFormat('yyyy-MM-dd').format(selectedDate);
+  void _bodyWeightEntriesChanged(List<BodyWeightEntry> entries) {
+    setState(() {
+      bodyWeightEntries = entries;
+      bodyWeightIsLoading = false;
+      bodyWeightLoadError = false;
+    });
+  }
+
+  void _bodyWeightLoadFinished(bool succeeded) {
+    setState(() {
+      bodyWeightIsLoading = false;
+      bodyWeightLoadError = !succeeded;
+    });
+  }
+
+  void _nutritionEntriesChanged(List<NutritionEntry> entries) {
+    setState(() {
+      nutritionEntries = entries;
+      nutritionIsLoading = false;
+      nutritionLoadError = false;
+    });
+  }
+
+  void _nutritionLoadFinished(bool succeeded) {
+    setState(() {
+      nutritionIsLoading = false;
+      nutritionLoadError = !succeeded;
+    });
+  }
 
   void moveDate(int days) {
     setState(() => selectedDate = selectedDate.add(Duration(days: days)));
@@ -110,81 +170,20 @@ class _JournalHomeState extends State<JournalHome> {
     if (date != null) setState(() => selectedDate = date);
   }
 
-  Widget card(Widget child) => Card(
-    color: surface,
-    child: Padding(padding: const EdgeInsets.all(16), child: child),
-  );
-
   Widget homePage() => DashboardPage(
     workouts: savedWorkouts,
     selectedDate: selectedDate,
     isLoading: workoutLoadStatus == null,
     hasLoadError: workoutLoadStatus == WorkoutLoadStatus.failed,
-    selectedDateWeight: weights[dateKey],
+    bodyWeightEntries: bodyWeightEntries,
+    isBodyWeightLoading: bodyWeightIsLoading,
+    bodyWeightLoadError: bodyWeightLoadError,
+    nutritionEntries: nutritionEntries,
+    isNutritionLoading: nutritionIsLoading,
+    nutritionLoadError: nutritionLoadError,
     onOpenWorkout: () => setState(() => selectedTab = 1),
+    onOpenMeals: () => setState(() => selectedTab = 2),
     onOpenWeight: () => setState(() => selectedTab = 3),
-  );
-
-  Widget mealsPage() => ListView(
-    padding: const EdgeInsets.all(12),
-    children: [
-      card(
-        const Text(
-          'Nutrition tracking is coming next.',
-          style: TextStyle(fontSize: 16),
-        ),
-      ),
-    ],
-  );
-
-  Widget weightPage() => ListView(
-    padding: const EdgeInsets.all(12),
-    children: [
-      card(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Daily weight (kg)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            TextFormField(
-              key: ValueKey(dateKey),
-              initialValue: weights[dateKey]?.toString() ?? '',
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(hintText: 'e.g. 73.2'),
-              onChanged: (value) {
-                weights[dateKey] = double.tryParse(value) ?? 0;
-              },
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () {
-                setState(() => weights[dateKey] = weights[dateKey] ?? 0);
-              },
-              child: const Text('Save weight'),
-            ),
-          ],
-        ),
-      ),
-      card(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Weight history',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            ...weights.entries.map(
-              (entry) => ListTile(
-                title: Text(entry.key),
-                trailing: Text('${entry.value} kg'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
   );
 
   @override
@@ -198,8 +197,18 @@ class _JournalHomeState extends State<JournalHome> {
         onWorkoutsChanged: _workoutsChanged,
         onLoadStatusChanged: _workoutLoadStatusChanged,
       ),
-      mealsPage(),
-      weightPage(),
+      NutritionPage(
+        repository: widget.nutritionRepository,
+        selectedDate: selectedDate,
+        onEntriesChanged: _nutritionEntriesChanged,
+        onLoadFinished: _nutritionLoadFinished,
+      ),
+      WeightPage(
+        repository: widget.bodyWeightRepository,
+        selectedDate: selectedDate,
+        onEntriesChanged: _bodyWeightEntriesChanged,
+        onLoadFinished: _bodyWeightLoadFinished,
+      ),
     ];
 
     return Scaffold(
