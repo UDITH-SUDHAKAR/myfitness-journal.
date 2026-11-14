@@ -212,6 +212,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       return WorkoutEditor(
         key: ValueKey('workout-editor-${_activeWorkout!.id}-$_editorMode'),
         workout: _activeWorkout!,
+        repository: widget.repository,
         exerciseLibraryRepository: widget.exerciseLibraryRepository,
         isNewWorkout: _editorMode == _EditorMode.creating,
         isReadOnly: _editorMode == _EditorMode.viewing,

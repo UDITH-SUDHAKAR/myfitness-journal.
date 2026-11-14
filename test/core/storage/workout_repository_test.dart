@@ -172,4 +172,168 @@ void main() {
     expect(await repository.getById(id), isNull);
     expect(await repository.getAll(), isEmpty);
   });
+
+  test(
+    'previous performance uses matching library ID and latest earlier date',
+    () async {
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 8),
+          exercises: [
+            Exercise(
+              name: 'Bench Press',
+              libraryExerciseId: 12,
+              sets: [
+                WorkoutSet(weight: 40, reps: 10, setNumber: 2),
+                WorkoutSet(weight: 35, reps: 12, setNumber: 1),
+              ],
+            ),
+          ],
+        ),
+      );
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 10),
+          exercises: [
+            Exercise(
+              // Same name but another library ID must not match.
+              name: 'Bench Press',
+              libraryExerciseId: 99,
+              sets: [WorkoutSet(weight: 90, reps: 1)],
+            ),
+          ],
+        ),
+      );
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 11),
+          exercises: [
+            Exercise(
+              name: 'Bench Press',
+              libraryExerciseId: 12,
+              sets: [WorkoutSet(weight: 42, reps: 9)],
+            ),
+          ],
+        ),
+      );
+      await repository.save(
+        Workout(
+          // Same date as the current workout: it is not previous.
+          date: DateTime(2026, 11, 14, 8),
+          exercises: [
+            Exercise(
+              name: 'Renamed Bench Press',
+              libraryExerciseId: 12,
+              sets: [WorkoutSet(weight: 100, reps: 1)],
+            ),
+          ],
+        ),
+      );
+
+      final performance = await repository.getPreviousPerformance(
+        exercise: Exercise(name: 'Bench Press', libraryExerciseId: 12),
+        beforeDate: DateTime(2026, 11, 14, 18),
+      );
+
+      expect(performance, isNotNull);
+      expect(performance!.date, DateTime(2026, 11, 11));
+      expect(performance.sets.single.weight, 42);
+      expect(performance.sets.single.reps, 9);
+    },
+  );
+
+  test(
+    'previous performance falls back to normalized names if an ID is absent',
+    () async {
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 13),
+          exercises: [
+            Exercise(
+              name: '  Cable   Row ',
+              sets: [WorkoutSet(weight: 30, reps: 10)],
+            ),
+          ],
+        ),
+      );
+
+      final performance = await repository.getPreviousPerformance(
+        exercise: Exercise(name: 'cable row', libraryExerciseId: 44),
+        beforeDate: DateTime(2026, 11, 14),
+      );
+
+      expect(performance, isNotNull);
+      expect(performance!.sets.single.weight, 30);
+    },
+  );
+
+  test(
+    'skips matching entries without sets and does not include same-day sessions',
+    () async {
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 12),
+          exercises: [Exercise(name: 'Deadlift')],
+        ),
+      );
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 14),
+          exercises: [
+            Exercise(
+              name: 'Deadlift',
+              sets: [WorkoutSet(weight: 150, reps: 1)],
+            ),
+          ],
+        ),
+      );
+
+      final performance = await repository.getPreviousPerformance(
+        exercise: Exercise(name: 'Deadlift'),
+        beforeDate: DateTime(2026, 11, 14),
+      );
+
+      expect(performance, isNull);
+    },
+  );
+
+  test(
+    'editing an older workout only considers workouts before its date',
+    () async {
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 9),
+          exercises: [
+            Exercise(name: 'Squat', sets: [WorkoutSet(weight: 60, reps: 5)]),
+          ],
+        ),
+      );
+      final olderWorkoutId = await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 12),
+          exercises: [
+            Exercise(name: 'Squat', sets: [WorkoutSet(weight: 70, reps: 5)]),
+          ],
+        ),
+      );
+      await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 13),
+          exercises: [
+            Exercise(name: 'Squat', sets: [WorkoutSet(weight: 90, reps: 1)]),
+          ],
+        ),
+      );
+
+      final olderWorkout = await repository.getById(olderWorkoutId);
+      final performance = await repository.getPreviousPerformance(
+        exercise: olderWorkout!.exercises.single,
+        beforeDate: olderWorkout.date,
+      );
+
+      expect(performance, isNotNull);
+      expect(performance!.date, DateTime(2026, 11, 9));
+      expect(performance.sets.single.weight, 60);
+    },
+  );
 }

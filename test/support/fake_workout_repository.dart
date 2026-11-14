@@ -1,6 +1,7 @@
 import 'package:myfitness_journal/core/models/exercise.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/core/models/workout_set.dart';
+import 'package:myfitness_journal/core/models/previous_performance.dart';
 import 'package:myfitness_journal/core/storage/workout_repository.dart';
 
 /// Small in-memory repository used by widget tests.
@@ -44,6 +45,18 @@ class FakeWorkoutRepository implements WorkoutRepository {
 
     _workouts.removeAt(index);
     return true;
+  }
+
+  @override
+  Future<PreviousPerformance?> getPreviousPerformance({
+    required Exercise exercise,
+    required DateTime beforeDate,
+  }) async {
+    return findPreviousPerformance(
+      workouts: _workouts,
+      exercise: exercise,
+      beforeDate: beforeDate,
+    );
   }
 
   Workout _copyWorkout(Workout workout) {

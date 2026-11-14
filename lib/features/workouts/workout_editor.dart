@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/models/exercise.dart';
 import '../../core/models/workout.dart';
 import '../../core/models/workout_set.dart';
+import '../../core/models/previous_performance.dart';
 import '../../core/models/exercise_library_item.dart';
 import '../../core/storage/exercise_library_repository.dart';
+import '../../core/storage/workout_repository.dart';
 import 'exercise_library_page.dart';
 
 /// Edits a new workout draft or shows a saved workout's details.
@@ -13,6 +17,7 @@ class WorkoutEditor extends StatefulWidget {
   /// Creates an editor for [workout].
   const WorkoutEditor({
     required this.workout,
+    required this.repository,
     required this.exerciseLibraryRepository,
     required this.isNewWorkout,
     required this.isReadOnly,
@@ -25,6 +30,9 @@ class WorkoutEditor extends StatefulWidget {
   /// The draft being created or edited. The parent passes it as a copy so
   /// changes stay local until the user explicitly saves.
   final Workout workout;
+
+  /// Loads read-only performance from earlier saved workouts.
+  final WorkoutRepository repository;
 
   /// Loads library items and optionally saves custom exercises.
   final ExerciseLibraryRepository exerciseLibraryRepository;
@@ -50,7 +58,25 @@ class WorkoutEditor extends StatefulWidget {
 
 class _WorkoutEditorState extends State<WorkoutEditor> {
   final _formKey = GlobalKey<FormState>();
+  final Map<Exercise, PreviousPerformance?> _previousPerformances = {};
+  final Set<Exercise> _previousPerformanceLoading = {};
+  final Set<Exercise> _previousPerformanceErrors = {};
+  int _previousPerformanceGeneration = 0;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final exercise in widget.workout.exercises) {
+      _previousPerformanceLoading.add(exercise);
+      unawaited(
+        _loadPreviousPerformance(
+          exercise,
+          generation: _previousPerformanceGeneration,
+        ),
+      );
+    }
+  }
 
   Future<void> _chooseDate() async {
     final date = await showDatePicker(
@@ -60,8 +86,53 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
       lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
 
-    if (date != null) {
-      setState(() => widget.workout.date = date);
+    if (date != null && mounted) {
+      widget.workout.date = date;
+      _refreshPreviousPerformances();
+    }
+  }
+
+  void _refreshPreviousPerformances() {
+    _previousPerformanceGeneration++;
+    final exercises = List<Exercise>.of(widget.workout.exercises);
+    setState(() {
+      _previousPerformances.clear();
+      _previousPerformanceErrors.clear();
+      _previousPerformanceLoading
+        ..clear()
+        ..addAll(exercises);
+    });
+    for (final exercise in exercises) {
+      unawaited(
+        _loadPreviousPerformance(
+          exercise,
+          generation: _previousPerformanceGeneration,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadPreviousPerformance(
+    Exercise exercise, {
+    required int generation,
+  }) async {
+    try {
+      final performance = await widget.repository.getPreviousPerformance(
+        exercise: exercise,
+        beforeDate: widget.workout.date,
+      );
+      if (!mounted || generation != _previousPerformanceGeneration) return;
+      setState(() {
+        _previousPerformances[exercise] = performance;
+        _previousPerformanceLoading.remove(exercise);
+        _previousPerformanceErrors.remove(exercise);
+      });
+    } catch (_) {
+      if (!mounted || generation != _previousPerformanceGeneration) return;
+      setState(() {
+        _previousPerformanceLoading.remove(exercise);
+        _previousPerformanceErrors.add(exercise);
+      });
     }
   }
 
@@ -72,15 +143,22 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
           _ExercisePicker(repository: widget.exerciseLibraryRepository),
     );
     if (selection != null && mounted) {
+      late Exercise exercise;
       setState(() {
-        widget.workout.exercises.add(
-          Exercise(
-            name: selection.name,
-            libraryExerciseId: selection.id < 0 ? null : selection.id,
-            sets: <WorkoutSet>[],
-          ),
+        exercise = Exercise(
+          name: selection.name,
+          libraryExerciseId: selection.id < 0 ? null : selection.id,
+          sets: <WorkoutSet>[],
         );
+        widget.workout.exercises.add(exercise);
+        _previousPerformanceLoading.add(exercise);
       });
+      unawaited(
+        _loadPreviousPerformance(
+          exercise,
+          generation: _previousPerformanceGeneration,
+        ),
+      );
     }
   }
 
@@ -313,6 +391,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text('No sets added yet.'),
               ),
+            _buildPreviousPerformance(exercise),
             ...List.generate(
               exercise.sets.length,
               (setIndex) => _buildSetRow(exerciseIndex, setIndex),
@@ -329,6 +408,76 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPreviousPerformance(Exercise exercise) {
+    final performance = _previousPerformances[exercise];
+    final isLoading = _previousPerformanceLoading.contains(exercise);
+    final hasError = _previousPerformanceErrors.contains(exercise);
+
+    return Container(
+      key: ValueKey('previous-performance-${exercise.name}'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.history,
+                size: 18,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Previous session',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              if (performance != null) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '· ${DateFormat('d MMM yyyy').format(performance.date)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (isLoading)
+            Text(
+              'Loading previous sets…',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else if (hasError)
+            Text(
+              'Previous performance could not be loaded.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else if (performance == null || performance.sets.isEmpty)
+            Text(
+              'No previous sets recorded.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else
+            ...performance.sets.map(
+              (set) => Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'Set ${set.setNumber}: ${_formatWeight(set.weight)} kg × '
+                  '${set.reps} reps',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
