@@ -1,17 +1,30 @@
+import 'package:isar_community/isar.dart';
+
 import 'exercise.dart';
+import 'workout_set.dart';
 
 /// A workout session containing the exercises completed on a date.
+///
+/// Isar stores each workout as a collection record. The nested exercises are
+/// embedded in that record, so the complete workout is loaded and saved
+/// together.
+part 'workout.g.dart';
+
+@collection
 class Workout {
-  /// Creates a workout with the given date and exercises.
+  /// Creates a workout. Isar assigns a unique [id] when it is first saved.
   Workout({
+    this.id = Isar.autoIncrement,
     required this.date,
     this.exercises = const [],
   });
 
+  /// The unique identifier assigned by Isar.
+  Id id;
+
   /// The date when the workout took place.
-  final DateTime date;
+  DateTime date;
 
   /// The exercises included in this workout.
-  final List<Exercise> exercises;
+  List<Exercise> exercises;
 }
-
