@@ -71,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Mon, 16 Nov 2026'), findsOneWidget);
-    expect(find.text('1 exercise'), findsOneWidget);
+    expect(find.text('1 exercise · 1 set'), findsOneWidget);
     final savedWorkouts = await repository.getAll();
     expect(savedWorkouts, hasLength(1));
     final savedId = savedWorkouts.single.id;

@@ -115,7 +115,8 @@ lib/
 - [ ] Local data persistence
 - [x] Exercise library
 - [ ] Workout logging
-- [ ] Workout history and personal records
+- [x] Workout history
+- [ ] Personal records
 - [ ] Dashboard improvements
 - [ ] Nutrition tracking
 - [ ] Body weight tracking
