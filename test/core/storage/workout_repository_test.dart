@@ -6,12 +6,12 @@ import 'package:isar_community/isar.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/core/models/workout_set.dart';
-import 'package:myfitness_journal/core/storage/workout_repository.dart';
+import 'package:myfitness_journal/core/storage/isar_workout_repository.dart';
 
 void main() {
   late Directory temporaryDirectory;
   late Isar isar;
-  late WorkoutRepository repository;
+  late IsarWorkoutRepository repository;
 
   setUpAll(() async {
     // Flutter widget tests need Isar's native core initialized explicitly.
@@ -36,7 +36,7 @@ void main() {
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp('workout_test_');
     isar = await Isar.open([WorkoutSchema], directory: temporaryDirectory.path);
-    repository = WorkoutRepository(isar);
+    repository = IsarWorkoutRepository(isar);
   });
 
   tearDown(() async {
