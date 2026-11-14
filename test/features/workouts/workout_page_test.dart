@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
+import 'package:myfitness_journal/core/models/exercise_library_item.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/core/models/workout_set.dart';
 import 'package:myfitness_journal/features/workouts/workout_page.dart';
 
 import '../../support/fake_workout_repository.dart';
+import '../../support/fake_exercise_library_repository.dart';
 
 void main() {
   late FakeWorkoutRepository repository;
+  late FakeExerciseLibraryRepository libraryRepository;
 
   setUp(() async {
     repository = FakeWorkoutRepository();
+    libraryRepository = FakeExerciseLibraryRepository();
   });
 
   Future<void> pumpWorkoutPage(WidgetTester tester) async {
@@ -20,6 +24,7 @@ void main() {
         home: Scaffold(
           body: WorkoutPage(
             repository: repository,
+            exerciseLibraryRepository: libraryRepository,
             selectedDate: DateTime(2026, 11, 14),
             onWorkoutsChanged: (_) {},
           ),
@@ -43,6 +48,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-exercise')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('exercise-name-input')),
@@ -161,5 +168,64 @@ void main() {
     expect(savedWorkout.exercises.single.name, 'Squat');
     expect(savedWorkout.exercises.single.sets, hasLength(1));
     expect(savedWorkout.exercises.single.sets.single.setNumber, 1);
+  });
+
+  testWidgets('searches and selects a library exercise with its ID snapshot', (
+    tester,
+  ) async {
+    final libraryId = await libraryRepository.save(
+      ExerciseLibraryItem(
+        name: 'Dumbbell Row',
+        muscleGroup: 'Back',
+        equipment: 'Dumbbell',
+      ),
+    );
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('exercise-library-search')),
+      'row',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dumbbell Row'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-set-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('set-reps-0-0')), '10');
+    final save = find.byKey(const ValueKey('save-workout'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    final saved = (await repository.getAll()).single.exercises.single;
+    expect(saved.libraryExerciseId, libraryId);
+    expect(saved.name, 'Dumbbell Row');
+  });
+
+  testWidgets('custom exercises can optionally be saved to the library', (
+    tester,
+  ) async {
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-exercise')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('exercise-name-input')),
+      'Band Pull Apart',
+    );
+    await tester.tap(find.text('Save to exercise library'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-add-exercise')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Band Pull Apart'), findsOneWidget);
+    expect(libraryRepository.items.single.name, 'Band Pull Apart');
+    expect(libraryRepository.items.single.muscleGroup, 'Other');
   });
 }

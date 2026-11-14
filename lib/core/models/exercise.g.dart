@@ -21,6 +21,11 @@ const ExerciseSchema = Schema(
 
       target: r'WorkoutSet',
     ),
+    r'workoutLibraryExerciseId': PropertySchema(
+      id: 2,
+      name: r'workoutLibraryExerciseId',
+      type: IsarType.long,
+    ),
   },
 
   estimateSize: _exerciseEstimateSize,
@@ -60,6 +65,7 @@ void _exerciseSerialize(
     WorkoutSetSchema.serialize,
     object.sets,
   );
+  writer.writeLong(offsets[2], object.libraryExerciseId);
 }
 
 Exercise _exerciseDeserialize(
@@ -78,6 +84,7 @@ Exercise _exerciseDeserialize(
           WorkoutSet(),
         ) ??
         const [],
+    libraryExerciseId: reader.readLongOrNull(offsets[2]),
   );
   return object;
 }
@@ -100,6 +107,8 @@ P _exerciseDeserializeProp<P>(
               ) ??
               const [])
           as P;
+    case 2:
+      return (reader.readLongOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -304,6 +313,82 @@ extension ExerciseQueryFilter
         includeLower,
         upper,
         includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'workoutLibraryExerciseId'),
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'workoutLibraryExerciseId'),
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'workoutLibraryExerciseId',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'workoutLibraryExerciseId',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'workoutLibraryExerciseId',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Exercise, Exercise, QAfterFilterCondition>
+  libraryExerciseIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'workoutLibraryExerciseId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
       );
     });
   }

@@ -2,6 +2,7 @@ import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/workout.dart';
+import '../models/exercise_library_item.dart';
 
 /// Opens and provides the app's Isar database instance.
 class IsarService {
@@ -28,7 +29,10 @@ class IsarService {
     }
 
     final directory = await getApplicationDocumentsDirectory();
-    _database = await Isar.open([WorkoutSchema], directory: directory.path);
+    _database = await Isar.open([
+      WorkoutSchema,
+      ExerciseLibraryItemSchema,
+    ], directory: directory.path);
     return _database!;
   }
 }

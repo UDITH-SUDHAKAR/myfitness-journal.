@@ -113,7 +113,7 @@ lib/
 
 - [ ] Workout data models
 - [ ] Local data persistence
-- [ ] Exercise library
+- [x] Exercise library
 - [ ] Workout logging
 - [ ] Workout history and personal records
 - [ ] Dashboard improvements
@@ -140,4 +140,3 @@ This project follows an issue-driven development workflow:
 ## License
 
 License to be determined.
- 

@@ -13,10 +13,17 @@ class Exercise {
   ///
   /// Isar needs an embedded object to have a constructor without required
   /// arguments. The defaults also make an empty exercise safe to create.
-  Exercise({this.name = '', this.sets = const []});
+  Exercise({this.name = '', this.sets = const [], this.libraryExerciseId});
 
   /// The name of the exercise, such as "Squat".
   String name;
+
+  /// ID of the library entry this exercise was copied from, if any.
+  ///
+  /// The name above remains a snapshot so workout history still reads well
+  /// when a library item is later renamed or deleted.
+  @Name('workoutLibraryExerciseId')
+  int? libraryExerciseId;
 
   /// The sets recorded for this exercise.
   List<WorkoutSet> sets;

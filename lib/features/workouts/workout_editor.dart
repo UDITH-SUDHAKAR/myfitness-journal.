@@ -4,12 +4,16 @@ import 'package:intl/intl.dart';
 import '../../core/models/exercise.dart';
 import '../../core/models/workout.dart';
 import '../../core/models/workout_set.dart';
+import '../../core/models/exercise_library_item.dart';
+import '../../core/storage/exercise_library_repository.dart';
+import 'exercise_library_page.dart';
 
 /// Edits a new workout draft or shows a saved workout's details.
 class WorkoutEditor extends StatefulWidget {
   /// Creates an editor for [workout].
   const WorkoutEditor({
     required this.workout,
+    required this.exerciseLibraryRepository,
     required this.isNewWorkout,
     required this.isReadOnly,
     required this.onSave,
@@ -21,6 +25,9 @@ class WorkoutEditor extends StatefulWidget {
   /// The draft being created or edited. The parent passes it as a copy so
   /// changes stay local until the user explicitly saves.
   final Workout workout;
+
+  /// Loads library items and optionally saves custom exercises.
+  final ExerciseLibraryRepository exerciseLibraryRepository;
 
   /// Whether this workout has not been saved before.
   final bool isNewWorkout;
@@ -59,42 +66,19 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
   }
 
   Future<void> _addExercise() async {
-    var enteredName = '';
-    final name = await showDialog<String>(
+    final selection = await showDialog<ExerciseLibraryItem?>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add exercise'),
-          content: TextField(
-            key: const ValueKey('exercise-name-input'),
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            onChanged: (value) => enteredName = value,
-            decoration: const InputDecoration(
-              labelText: 'Exercise name',
-              hintText: 'e.g. Squat',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const ValueKey('confirm-add-exercise'),
-              onPressed: () => Navigator.pop(dialogContext, enteredName),
-              child: const Text('Add exercise'),
-            ),
-          ],
-        );
-      },
+      builder: (_) =>
+          _ExercisePicker(repository: widget.exerciseLibraryRepository),
     );
-
-    final exerciseName = name?.trim() ?? '';
-    if (exerciseName.isNotEmpty && mounted) {
+    if (selection != null && mounted) {
       setState(() {
         widget.workout.exercises.add(
-          Exercise(name: exerciseName, sets: <WorkoutSet>[]),
+          Exercise(
+            name: selection.name,
+            libraryExerciseId: selection.id < 0 ? null : selection.id,
+            sets: <WorkoutSet>[],
+          ),
         );
       });
     }
@@ -417,4 +401,155 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
       ),
     );
   }
+}
+
+class _ExercisePicker extends StatefulWidget {
+  const _ExercisePicker({required this.repository});
+  final ExerciseLibraryRepository repository;
+
+  @override
+  State<_ExercisePicker> createState() => _ExercisePickerState();
+}
+
+class _ExercisePickerState extends State<_ExercisePicker> {
+  final _search = TextEditingController();
+  List<ExerciseLibraryItem> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final items = await widget.repository.search(_search.text);
+    if (mounted) setState(() => _items = items);
+  }
+
+  Future<void> _addCustom() async {
+    var enteredName = '';
+    var saveToLibrary = false;
+    final item = await showDialog<ExerciseLibraryItem>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Custom exercise'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const ValueKey('exercise-name-input'),
+                autofocus: true,
+                onChanged: (value) => enteredName = value,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Exercise name'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: saveToLibrary,
+                title: const Text('Save to exercise library'),
+                onChanged: (value) =>
+                    setDialogState(() => saveToLibrary = value ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('confirm-add-exercise'),
+              onPressed: () {
+                final name = enteredName.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(
+                  context,
+                  ExerciseLibraryItem(
+                    id: saveToLibrary ? -1 : -2,
+                    name: name,
+                    muscleGroup: 'Other',
+                    equipment: 'Other',
+                  ),
+                );
+              },
+              child: const Text('Add exercise'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (item == null || !mounted) return;
+    if (item.id == -1) item.id = await widget.repository.save(item);
+    if (!mounted) return;
+    Navigator.pop(context, item);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Choose exercise'),
+    content: SizedBox(
+      width: 420,
+      height: 380,
+      child: Column(
+        children: [
+          TextField(
+            key: const ValueKey('exercise-library-search'),
+            controller: _search,
+            decoration: const InputDecoration(
+              labelText: 'Search library',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (_) => _load(),
+          ),
+          Expanded(
+            child: _items.isEmpty
+                ? const Center(child: Text('No matching exercises'))
+                : ListView.builder(
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return ListTile(
+                        title: Text(item.name),
+                        subtitle: Text(
+                          '${item.muscleGroup} • ${item.equipment}',
+                        ),
+                        onTap: () => Navigator.pop(context, item),
+                      );
+                    },
+                  ),
+          ),
+          TextButton.icon(
+            key: const ValueKey('add-custom-exercise'),
+            onPressed: _addCustom,
+            icon: const Icon(Icons.edit),
+            label: const Text('Add custom exercise'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ExerciseLibraryPage(repository: widget.repository),
+              ),
+            ).then((_) => _load()),
+            icon: const Icon(Icons.library_add),
+            label: const Text('Manage library'),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+    ],
+  );
 }

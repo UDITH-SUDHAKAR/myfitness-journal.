@@ -9,11 +9,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:myfitness_journal/main.dart';
 import 'support/fake_workout_repository.dart';
+import 'support/fake_exercise_library_repository.dart';
 
 void main() {
   testWidgets('home and existing tabs remain available', (tester) async {
     await tester.pumpWidget(
-      MyFitnessApp(workoutRepository: FakeWorkoutRepository()),
+      MyFitnessApp(
+        workoutRepository: FakeWorkoutRepository(),
+        exerciseLibraryRepository: FakeExerciseLibraryRepository(),
+      ),
     );
     await tester.pumpAndSettle();
 
