@@ -1,6 +1,8 @@
 import 'package:isar_community/isar.dart';
 
 import '../models/workout.dart';
+import '../models/exercise.dart';
+import '../models/previous_performance.dart';
 import 'workout_repository.dart';
 
 /// Isar-backed implementation of [WorkoutRepository].
@@ -41,5 +43,18 @@ class IsarWorkoutRepository implements WorkoutRepository {
   @override
   Future<bool> delete(Id id) {
     return _isar.writeTxn(() => _isar.workouts.delete(id));
+  }
+
+  @override
+  Future<PreviousPerformance?> getPreviousPerformance({
+    required Exercise exercise,
+    required DateTime beforeDate,
+  }) async {
+    final workouts = await getAll();
+    return findPreviousPerformance(
+      workouts: workouts,
+      exercise: exercise,
+      beforeDate: beforeDate,
+    );
   }
 }

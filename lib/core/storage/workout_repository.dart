@@ -1,4 +1,6 @@
 import '../models/workout.dart';
+import '../models/exercise.dart';
+import '../models/previous_performance.dart';
 
 /// The operations the UI needs for loading and saving workouts.
 ///
@@ -19,4 +21,10 @@ abstract interface class WorkoutRepository {
 
   /// Deletes a workout. Returns `false` if it was not found.
   Future<bool> delete(int id);
+
+  /// Finds the latest matching exercise session strictly before [beforeDate].
+  Future<PreviousPerformance?> getPreviousPerformance({
+    required Exercise exercise,
+    required DateTime beforeDate,
+  });
 }

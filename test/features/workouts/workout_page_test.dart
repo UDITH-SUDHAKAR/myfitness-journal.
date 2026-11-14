@@ -135,7 +135,10 @@ void main() {
     await pumpWorkoutPage(tester);
     await tester.tap(find.byKey(ValueKey('workout-$id')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('edit-workout')));
+    await tester.drag(find.byType(ListView), const Offset(0, -1000));
+    await tester.pumpAndSettle();
+    final editButton = find.byKey(const ValueKey('edit-workout'));
+    await tester.tap(editButton);
     await tester.pumpAndSettle();
 
     final deleteSetButton = find.byKey(const ValueKey('remove-set-0-1'));
@@ -205,6 +208,91 @@ void main() {
     expect(saved.name, 'Dumbbell Row');
   });
 
+  testWidgets('shows previous sets separately from the current workout sets', (
+    tester,
+  ) async {
+    final previousId = await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 13),
+        exercises: [
+          Exercise(
+            name: 'Bench   Press',
+            sets: [
+              WorkoutSet(weight: 40, reps: 10, setNumber: 1),
+              WorkoutSet(weight: 45, reps: 8, setNumber: 2),
+            ],
+          ),
+        ],
+      ),
+    );
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-exercise')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-custom-exercise')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('exercise-name-input')),
+      'bench press',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-add-exercise')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Previous session'), findsOneWidget);
+    expect(find.text('Set 1: 40 kg × 10 reps'), findsOneWidget);
+    expect(find.text('Set 2: 45 kg × 8 reps'), findsOneWidget);
+    expect(find.byKey(const ValueKey('set-weight-0-0')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('add-set-0')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('set-weight-0-0')), '50');
+
+    final savedPreviousWorkout = await repository.getById(previousId);
+    expect(savedPreviousWorkout!.exercises.single.sets.first.weight, 40);
+    expect(savedPreviousWorkout.exercises.single.sets.last.weight, 45);
+  });
+
+  testWidgets('editing an older workout shows only earlier performance', (
+    tester,
+  ) async {
+    await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 9),
+        exercises: [
+          Exercise(name: 'Squat', sets: [WorkoutSet(weight: 60, reps: 5)]),
+        ],
+      ),
+    );
+    final olderId = await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 12),
+        exercises: [
+          Exercise(name: 'Squat', sets: [WorkoutSet(weight: 70, reps: 5)]),
+        ],
+      ),
+    );
+    await repository.save(
+      Workout(
+        date: DateTime(2026, 11, 13),
+        exercises: [
+          Exercise(name: 'Squat', sets: [WorkoutSet(weight: 90, reps: 1)]),
+        ],
+      ),
+    );
+
+    await pumpWorkoutPage(tester);
+    await tester.tap(find.byKey(ValueKey('workout-$olderId')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set 1: 60 kg × 5 reps'), findsOneWidget);
+    expect(find.text('Set 1: 90 kg × 1 reps'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('edit-workout')));
+    await tester.pumpAndSettle();
+    expect(find.text('Set 1: 60 kg × 5 reps'), findsOneWidget);
+    expect(find.text('Set 1: 90 kg × 1 reps'), findsNothing);
+  });
+
   testWidgets('custom exercises can optionally be saved to the library', (
     tester,
   ) async {
@@ -225,6 +313,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Band Pull Apart'), findsOneWidget);
+    expect(find.text('No previous sets recorded.'), findsOneWidget);
     expect(libraryRepository.items.single.name, 'Band Pull Apart');
     expect(libraryRepository.items.single.muscleGroup, 'Other');
   });
