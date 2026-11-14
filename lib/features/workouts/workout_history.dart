@@ -11,6 +11,7 @@ class WorkoutHistory extends StatefulWidget {
     required this.workouts,
     required this.onOpenWorkout,
     required this.onCreateWorkout,
+    required this.onOpenPersonalRecords,
     super.key,
   });
 
@@ -22,6 +23,9 @@ class WorkoutHistory extends StatefulWidget {
 
   /// Starts a new workout.
   final VoidCallback onCreateWorkout;
+
+  /// Opens the page with calculated exercise records.
+  final VoidCallback onOpenPersonalRecords;
 
   @override
   State<WorkoutHistory> createState() => _WorkoutHistoryState();
@@ -126,14 +130,23 @@ class _WorkoutHistoryState extends State<WorkoutHistory> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            key: const ValueKey('start-workout'),
-            onPressed: widget.onCreateWorkout,
-            icon: const Icon(Icons.add),
-            label: const Text('Start workout'),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            FilledButton.icon(
+              key: const ValueKey('start-workout'),
+              onPressed: widget.onCreateWorkout,
+              icon: const Icon(Icons.add),
+              label: const Text('Start workout'),
+            ),
+            OutlinedButton.icon(
+              key: const ValueKey('open-personal-records'),
+              onPressed: widget.onOpenPersonalRecords,
+              icon: const Icon(Icons.emoji_events_outlined),
+              label: const Text('Personal records'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         const Text(

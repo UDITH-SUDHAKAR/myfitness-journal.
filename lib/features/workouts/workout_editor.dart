@@ -7,9 +7,11 @@ import '../../core/models/exercise.dart';
 import '../../core/models/workout.dart';
 import '../../core/models/workout_set.dart';
 import '../../core/models/previous_performance.dart';
+import '../../core/models/personal_record.dart';
 import '../../core/models/exercise_library_item.dart';
 import '../../core/storage/exercise_library_repository.dart';
 import '../../core/storage/workout_repository.dart';
+import 'personal_record_calculator.dart';
 import 'exercise_library_page.dart';
 
 /// Edits a new workout draft or shows a saved workout's details.
@@ -18,6 +20,7 @@ class WorkoutEditor extends StatefulWidget {
   const WorkoutEditor({
     required this.workout,
     required this.repository,
+    required this.personalRecordWorkouts,
     required this.exerciseLibraryRepository,
     required this.isNewWorkout,
     required this.isReadOnly,
@@ -33,6 +36,9 @@ class WorkoutEditor extends StatefulWidget {
 
   /// Loads read-only performance from earlier saved workouts.
   final WorkoutRepository repository;
+
+  /// Saved sessions used as the baseline for live PR indicators.
+  final List<Workout> personalRecordWorkouts;
 
   /// Loads library items and optionally saves custom exercises.
   final ExerciseLibraryRepository exerciseLibraryRepository;
@@ -61,6 +67,10 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
   final Map<Exercise, PreviousPerformance?> _previousPerformances = {};
   final Set<Exercise> _previousPerformanceLoading = {};
   final Set<Exercise> _previousPerformanceErrors = {};
+  final Set<WorkoutSet> _weightChangedSets = {};
+  final Set<WorkoutSet> _repsChangedSets = {};
+  late final List<ExercisePersonalRecords> _personalRecords =
+      PersonalRecordCalculator.calculate(widget.personalRecordWorkouts);
   int _previousPerformanceGeneration = 0;
   bool _isSaving = false;
 
@@ -165,7 +175,8 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
   void _addSet(int exerciseIndex) {
     setState(() {
       final sets = widget.workout.exercises[exerciseIndex].sets;
-      sets.add(WorkoutSet(setNumber: sets.length + 1));
+      final set = WorkoutSet(setNumber: sets.length + 1);
+      sets.add(set);
     });
   }
 
@@ -392,6 +403,7 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
                 child: Text('No sets added yet.'),
               ),
             _buildPreviousPerformance(exercise),
+            _buildNewRecordIndicators(exercise),
             ...List.generate(
               exercise.sets.length,
               (setIndex) => _buildSetRow(exerciseIndex, setIndex),
@@ -408,6 +420,78 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNewRecordIndicators(Exercise exercise) {
+    if (widget.isReadOnly) return const SizedBox.shrink();
+
+    final records = PersonalRecordCalculator.forExercise(
+      _personalRecords,
+      exercise,
+    );
+    bool isValid(WorkoutSet set) =>
+        set.reps > 0 && set.weight >= 0 && set.weight.isFinite;
+    final weightCandidates = exercise.sets.where(
+      (set) =>
+          isValid(set) &&
+          (widget.isNewWorkout || _weightChangedSets.contains(set)),
+    );
+    final repsCandidates = exercise.sets.where(
+      (set) =>
+          isValid(set) &&
+          (widget.isNewWorkout || _repsChangedSets.contains(set)),
+    );
+
+    final newHeavySet = weightCandidates
+        .where((set) => set.weight > 0)
+        .fold<WorkoutSet?>(
+          null,
+          (best, set) => best == null || set.weight > best.weight ? set : best,
+        );
+    final newRepSet = repsCandidates.fold<WorkoutSet?>(
+      null,
+      (best, set) => best == null || set.reps > best.reps ? set : best,
+    );
+    final exceedsWeightRecord =
+        newHeavySet != null &&
+        (records?.heaviestSet == null ||
+            newHeavySet.weight > records!.heaviestSet!.weight);
+    final exceedsRepRecord =
+        newRepSet != null &&
+        (records?.mostReps == null || newRepSet.reps > records!.mostReps!.reps);
+
+    if (!exceedsWeightRecord && !exceedsRepRecord) {
+      return const SizedBox.shrink();
+    }
+
+    final messages = <String>[
+      if (exceedsWeightRecord)
+        'New PR · Heaviest set: ${_formatWeight(newHeavySet.weight)} kg × '
+            '${newHeavySet.reps} reps',
+      if (exceedsRepRecord)
+        'New PR · Most reps: ${newRepSet.reps} reps at '
+            '${_formatWeight(newRepSet.weight)} kg',
+    ];
+
+    return Container(
+      key: ValueKey('new-pr-${exercise.name}'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: messages
+            .map(
+              (message) =>
+                  Text(message, style: Theme.of(context).textTheme.labelMedium),
+            )
+            .toList(),
       ),
     );
   }
@@ -516,7 +600,12 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
               },
               onChanged: (value) {
                 final weight = double.tryParse(value);
-                if (weight != null && weight >= 0) set.weight = weight;
+                if (weight != null && weight >= 0) {
+                  setState(() {
+                    set.weight = weight;
+                    _weightChangedSets.add(set);
+                  });
+                }
               },
             ),
           ),
@@ -535,7 +624,12 @@ class _WorkoutEditorState extends State<WorkoutEditor> {
               },
               onChanged: (value) {
                 final reps = int.tryParse(value);
-                if (reps != null && reps > 0) set.reps = reps;
+                if (reps != null && reps > 0) {
+                  setState(() {
+                    set.reps = reps;
+                    _repsChangedSets.add(set);
+                  });
+                }
               },
             ),
           ),

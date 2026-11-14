@@ -7,6 +7,7 @@ import '../../core/storage/workout_repository.dart';
 import '../../core/storage/exercise_library_repository.dart';
 import 'workout_editor.dart';
 import 'workout_history.dart';
+import 'personal_records_page.dart';
 
 enum _EditorMode { creating, viewing, editing }
 
@@ -206,13 +207,31 @@ class _WorkoutPageState extends State<WorkoutPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _openPersonalRecords() async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PersonalRecordsPage(repository: widget.repository),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_editorMode != null && _activeWorkout != null) {
+      final recordBaseline = switch (_editorMode) {
+        _EditorMode.creating => _workouts,
+        _EditorMode.editing =>
+          _workouts
+              .where((workout) => workout.id != _activeWorkout!.id)
+              .toList(),
+        _EditorMode.viewing || null => const <Workout>[],
+      };
       return WorkoutEditor(
         key: ValueKey('workout-editor-${_activeWorkout!.id}-$_editorMode'),
         workout: _activeWorkout!,
         repository: widget.repository,
+        personalRecordWorkouts: recordBaseline,
         exerciseLibraryRepository: widget.exerciseLibraryRepository,
         isNewWorkout: _editorMode == _EditorMode.creating,
         isReadOnly: _editorMode == _EditorMode.viewing,
@@ -251,6 +270,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       workouts: _workouts,
       onOpenWorkout: _openWorkout,
       onCreateWorkout: _startWorkout,
+      onOpenPersonalRecords: _openPersonalRecords,
     );
   }
 }
