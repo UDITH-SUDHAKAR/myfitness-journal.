@@ -4,6 +4,7 @@ import '../../core/models/exercise.dart';
 import '../../core/models/workout.dart';
 import '../../core/models/workout_set.dart';
 import '../../core/storage/workout_repository.dart';
+import '../../core/storage/exercise_library_repository.dart';
 import 'workout_editor.dart';
 import 'workout_history.dart';
 
@@ -14,6 +15,7 @@ class WorkoutPage extends StatefulWidget {
   /// Creates the workout page using the app's repository.
   const WorkoutPage({
     required this.repository,
+    required this.exerciseLibraryRepository,
     required this.selectedDate,
     required this.onWorkoutsChanged,
     super.key,
@@ -21,6 +23,9 @@ class WorkoutPage extends StatefulWidget {
 
   /// Loads and saves persisted workout records.
   final WorkoutRepository repository;
+
+  /// Provides reusable exercise definitions to the workout editor.
+  final ExerciseLibraryRepository exerciseLibraryRepository;
 
   /// Date selected in the app's date navigation.
   final DateTime selectedDate;
@@ -92,6 +97,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
           .map(
             (exercise) => Exercise(
               name: exercise.name,
+              libraryExerciseId: exercise.libraryExerciseId,
               sets: exercise.sets
                   .map(
                     (set) => WorkoutSet(
@@ -206,6 +212,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       return WorkoutEditor(
         key: ValueKey('workout-editor-${_activeWorkout!.id}-$_editorMode'),
         workout: _activeWorkout!,
+        exerciseLibraryRepository: widget.exerciseLibraryRepository,
         isNewWorkout: _editorMode == _EditorMode.creating,
         isReadOnly: _editorMode == _EditorMode.viewing,
         onSave: _saveWorkout,

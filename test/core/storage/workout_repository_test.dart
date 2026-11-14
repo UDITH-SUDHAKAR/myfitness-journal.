@@ -4,9 +4,11 @@ import 'dart:ffi' show Abi;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isar_community/isar.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
+import 'package:myfitness_journal/core/models/exercise_library_item.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/core/models/workout_set.dart';
 import 'package:myfitness_journal/core/storage/isar_workout_repository.dart';
+import 'package:myfitness_journal/core/storage/isar_exercise_library_repository.dart';
 
 void main() {
   late Directory temporaryDirectory;
@@ -35,7 +37,10 @@ void main() {
 
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp('workout_test_');
-    isar = await Isar.open([WorkoutSchema], directory: temporaryDirectory.path);
+    isar = await Isar.open([
+      WorkoutSchema,
+      ExerciseLibraryItemSchema,
+    ], directory: temporaryDirectory.path);
     repository = IsarWorkoutRepository(isar);
   });
 
@@ -45,11 +50,20 @@ void main() {
   });
 
   test('saves and retrieves workouts with nested exercises and sets', () async {
+    final libraryRepository = IsarExerciseLibraryRepository(isar);
+    final libraryId = await libraryRepository.save(
+      ExerciseLibraryItem(
+        name: 'Squat',
+        muscleGroup: 'Legs',
+        equipment: 'Barbell',
+      ),
+    );
     final workout = Workout(
       date: DateTime(2026, 11, 14),
       exercises: [
         Exercise(
           name: 'Squat',
+          libraryExerciseId: libraryId,
           sets: [
             WorkoutSet(weight: 60, reps: 8, setNumber: 1),
             WorkoutSet(weight: 65, reps: 6, setNumber: 2),
@@ -67,12 +81,71 @@ void main() {
     expect(savedWorkout!.date, DateTime(2026, 11, 14));
     expect(savedWorkout.exercises, hasLength(1));
     expect(savedWorkout.exercises.single.name, 'Squat');
+    expect(savedWorkout.exercises.single.libraryExerciseId, libraryId);
     expect(savedWorkout.exercises.single.sets, hasLength(2));
     expect(savedWorkout.exercises.single.sets.last.weight, 65);
     expect(savedWorkout.exercises.single.sets.last.reps, 6);
     expect(savedWorkout.exercises.single.sets.last.setNumber, 2);
     expect(allWorkouts, hasLength(1));
   });
+
+  test('exercise library supports name search, update, and delete', () async {
+    final library = IsarExerciseLibraryRepository(isar);
+    final id = await library.save(
+      ExerciseLibraryItem(
+        name: 'Incline Dumbbell Press',
+        muscleGroup: 'Chest',
+        equipment: 'Dumbbell',
+        description: 'Press while seated on an incline bench.',
+      ),
+    );
+    await library.save(
+      ExerciseLibraryItem(
+        name: 'Back Squat',
+        muscleGroup: 'Legs',
+        equipment: 'Barbell',
+      ),
+    );
+
+    expect(await library.search('dumbbell'), hasLength(1));
+    expect((await library.search('')).length, 2);
+
+    final item = (await library.search('Incline')).single;
+    item.name = 'Incline Press';
+    expect(await library.update(item), isTrue);
+    expect((await library.search('Incline')).single.name, 'Incline Press');
+    expect(await library.delete(id), isTrue);
+    expect(await library.search('Incline'), isEmpty);
+  });
+
+  test(
+    'library deletion leaves logged exercise name snapshot intact',
+    () async {
+      final library = IsarExerciseLibraryRepository(isar);
+      final libraryId = await library.save(
+        ExerciseLibraryItem(
+          name: 'Cable Fly',
+          muscleGroup: 'Chest',
+          equipment: 'Cable',
+        ),
+      );
+      final workoutId = await repository.save(
+        Workout(
+          date: DateTime(2026, 11, 14),
+          exercises: [
+            Exercise(name: 'Cable Fly', libraryExerciseId: libraryId),
+          ],
+        ),
+      );
+
+      expect(await library.delete(libraryId), isTrue);
+      final loggedExercise = (await repository.getById(
+        workoutId,
+      ))!.exercises.single;
+      expect(loggedExercise.name, 'Cable Fly');
+      expect(loggedExercise.libraryExerciseId, libraryId);
+    },
+  );
 
   test('updates an existing workout and reports a missing workout', () async {
     final id = await repository.save(Workout(date: DateTime(2026, 11, 14)));

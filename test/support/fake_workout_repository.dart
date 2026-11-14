@@ -54,6 +54,7 @@ class FakeWorkoutRepository implements WorkoutRepository {
           .map(
             (exercise) => Exercise(
               name: exercise.name,
+              libraryExerciseId: exercise.libraryExerciseId,
               sets: exercise.sets
                   .map(
                     (set) => WorkoutSet(
