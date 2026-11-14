@@ -1,18 +1,22 @@
+import 'package:isar_community/isar.dart';
+
 /// One set performed for an exercise during a workout.
+///
+/// This is embedded in an exercise, so it has no separate database ID.
+part 'workout_set.g.dart';
+
+@embedded
 class WorkoutSet {
   /// Creates a set with its weight, repetitions, and position in the exercise.
-  const WorkoutSet({
-    required this.weight,
-    required this.reps,
-    required this.setNumber,
-  });
+  /// Isar can create an empty embedded object using these defaults.
+  WorkoutSet({this.weight = 0, this.reps = 0, this.setNumber = 1});
 
   /// The weight used for this set.
-  final double weight;
+  double weight;
 
   /// The number of repetitions completed.
-  final int reps;
+  int reps;
 
   /// The position of this set within the exercise, starting at 1.
-  final int setNumber;
+  int setNumber;
 }

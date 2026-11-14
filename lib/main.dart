@@ -1,7 +1,13 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-void main() => runApp(const MyFitnessApp());
+import 'core/storage/isar_service.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await IsarService.instance.initialize();
+  runApp(const MyFitnessApp());
+}
 
 const teal = Color(0xFF20B8A9);
 const background = Color(0xFF181C20);
