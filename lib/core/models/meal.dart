@@ -10,6 +10,7 @@ class Meal {
     this.id = Isar.autoIncrement,
     required this.name,
     required this.consumedAt,
+    this.category,
     this.items = const [],
   });
 
@@ -21,6 +22,12 @@ class Meal {
 
   /// Date and time when the meal was consumed.
   DateTime consumedAt;
+
+  /// Meal category such as Breakfast, Lunch, Dinner, or Snacks.
+  ///
+  /// This is nullable so meals saved before categories were introduced remain
+  /// readable without changing or migrating their records.
+  String? category;
 
   /// Food portions recorded as snapshots inside this meal.
   List<MealFoodItem> items;

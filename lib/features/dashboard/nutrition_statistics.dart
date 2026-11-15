@@ -1,3 +1,4 @@
+import '../../core/models/meal.dart';
 import '../../core/models/nutrition_entry.dart';
 
 /// Daily nutrition totals summed from saved entries.
@@ -7,7 +8,7 @@ class DailyNutritionTotals {
     required this.proteinGrams,
   });
 
-  final int calories;
+  final double calories;
   final double proteinGrams;
 }
 
@@ -18,19 +19,38 @@ class NutritionStatisticsCalculator {
   static DailyNutritionTotals forDate({
     required List<NutritionEntry> entries,
     required DateTime date,
+    List<Meal> meals = const [],
   }) {
     final matchingEntries = entries.where(
-      (entry) =>
-          entry.date.year == date.year &&
-          entry.date.month == date.month &&
-          entry.date.day == date.day,
+      (entry) => _sameDay(entry.date, date),
+    );
+    final matchingMeals = meals.where(
+      (meal) => _sameDay(meal.consumedAt, date),
     );
     return DailyNutritionTotals(
-      calories: matchingEntries.fold(0, (sum, entry) => sum + entry.calories),
-      proteinGrams: matchingEntries.fold(
-        0,
-        (sum, entry) => sum + entry.proteinGrams,
-      ),
+      calories:
+          matchingEntries.fold<double>(
+            0,
+            (sum, entry) => sum + entry.calories,
+          ) +
+          matchingMeals.fold<double>(
+            0,
+            (sum, meal) => sum + meal.totalCalories,
+          ),
+      proteinGrams:
+          matchingEntries.fold<double>(
+            0,
+            (sum, entry) => sum + entry.proteinGrams,
+          ) +
+          matchingMeals.fold<double>(
+            0,
+            (sum, meal) => sum + meal.totalProteinGrams,
+          ),
     );
   }
+
+  static bool _sameDay(DateTime first, DateTime second) =>
+      first.year == second.year &&
+      first.month == second.month &&
+      first.day == second.day;
 }

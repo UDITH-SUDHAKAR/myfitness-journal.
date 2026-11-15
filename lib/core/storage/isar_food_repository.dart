@@ -27,6 +27,16 @@ class IsarFoodRepository implements FoodRepository {
   }
 
   @override
+  Future<List<Food>> searchByName(String query) async {
+    final normalizedQuery = query.trim().toLowerCase();
+    final foods = await getAll();
+    if (normalizedQuery.isEmpty) return foods;
+    return foods
+        .where((food) => food.name.toLowerCase().contains(normalizedQuery))
+        .toList();
+  }
+
+  @override
   Future<Food?> getById(Id id) => _isar.foods.get(id);
 
   @override
