@@ -92,6 +92,51 @@ Run tests:
 flutter test
 ```
 
+## Google Sign-In and local account storage
+
+Authentication is optional. Build with Supabase settings to enable Google
+Sign-In; without them, users can choose **Continue Offline** and keep using
+the original device-only Isar database.
+
+Pass the project URL, client-side publishable key, and Google Web OAuth client
+ID at build time:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://your-project.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
+  --dart-define=GOOGLE_WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+```
+
+The Supabase publishable key is intended for client applications. Never put a
+Supabase service-role or secret key in the Flutter app. Do not commit real
+project configuration or OAuth secrets to source control.
+
+### Supabase and Google Cloud setup
+
+1. In Google Cloud Console, configure the OAuth consent screen and create an
+   Android OAuth client using the Android application ID
+   `com.example.myfitness_journal` and the SHA-1 signing certificate
+   fingerprint(s) for each build type you use (debug, local release, and store
+   signing as applicable).
+2. Create a Google **Web application** OAuth client. Add the callback URL shown
+   on the Supabase Google provider page to that client's authorized redirect
+   URIs. Enable Google under Supabase Authentication → Sign In / Providers,
+   enter the Web client ID and client secret, and register the Android client ID
+   in the provider's client ID list. The client secret stays in Supabase; the
+   Flutter app only needs the Web client ID.
+3. Supply the Supabase project URL and publishable key, plus that Web client ID,
+   to Flutter using the `--dart-define` values above.
+4. Android internet permission is declared in the app manifest. Native Google
+   ID-token sign-in exchanges credentials with Supabase and does not require a
+   browser redirect or app deep-link callback.
+
+On restart, Supabase restores its persisted session. Signing out clears that
+Supabase session on this device and returns to the authentication screen. The
+existing offline database is retained; each authenticated Supabase user ID
+opens a separate local Isar database. Existing offline entries are not copied
+into an account database, and no cloud backup or synchronization is performed.
+
 ## Project Structure
 
 ```text
