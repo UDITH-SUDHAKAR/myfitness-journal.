@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/models/body_weight_entry.dart';
 import '../../core/storage/body_weight_repository.dart';
+import 'body_weight_progress_calculator.dart';
 
 /// Records daily body weight and shows the saved measurements.
 class WeightPage extends StatefulWidget {
@@ -27,7 +31,9 @@ class _WeightPageState extends State<WeightPage> {
   final _weightController = TextEditingController();
   List<BodyWeightEntry> _entries = [];
   bool _isLoading = true;
+  bool _hasLoadError = false;
   String? _error;
+  BodyWeightProgressPeriod _progressPeriod = BodyWeightProgressPeriod.weeks;
 
   @override
   void initState() {
@@ -50,12 +56,17 @@ class _WeightPageState extends State<WeightPage> {
   }
 
   Future<void> _loadEntries() async {
+    setState(() {
+      _isLoading = true;
+      _hasLoadError = false;
+    });
     try {
       final entries = await widget.repository.getAll();
       if (!mounted) return;
       setState(() {
         _entries = entries;
         _isLoading = false;
+        _hasLoadError = false;
         _error = null;
       });
       _setValueForSelectedDate();
@@ -65,6 +76,7 @@ class _WeightPageState extends State<WeightPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _hasLoadError = true;
         _error = error.toString();
       });
       widget.onLoadFinished(false);
@@ -158,11 +170,276 @@ class _WeightPageState extends State<WeightPage> {
     }
   }
 
+  BodyWeightProgress get _progress =>
+      _progressPeriod == BodyWeightProgressPeriod.weeks
+      ? BodyWeightProgressCalculator.forWeeks(
+          entries: _entries,
+          referenceDate: DateTime.now(),
+        )
+      : BodyWeightProgressCalculator.forMonths(
+          entries: _entries,
+          referenceDate: DateTime.now(),
+        );
+
+  String get _progressPeriodLabel =>
+      _progressPeriod == BodyWeightProgressPeriod.weeks
+      ? '12 weeks'
+      : '12 months';
+
+  Widget _buildProgressChart(BuildContext context) {
+    if (_isLoading) {
+      return const Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          ),
+          Text('Loading weight progress...'),
+        ],
+      );
+    }
+    if (_hasLoadError) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Could not load weight progress.'),
+          TextButton(onPressed: _loadEntries, child: const Text('Try again')),
+        ],
+      );
+    }
+    if (_entries.isEmpty) {
+      return const Text('Record weight to start building your progress chart.');
+    }
+
+    final progress = _progress;
+    if (progress.entries.isEmpty) {
+      return Text('No weight entries in the last $_progressPeriodLabel.');
+    }
+
+    final chartEntries = progress.entries;
+    final firstOrdinal = DateTime.utc(
+      progress.startDate.year,
+      progress.startDate.month,
+      progress.startDate.day,
+    );
+    final spots = chartEntries.map((entry) {
+      final entryOrdinal = DateTime.utc(
+        entry.date.year,
+        entry.date.month,
+        entry.date.day,
+      );
+      return FlSpot(
+        entryOrdinal.difference(firstOrdinal).inDays.toDouble(),
+        entry.weightKg,
+      );
+    }).toList();
+    final chartSegments = _segmentsForMeasurements(spots);
+    final weights = chartEntries.map((entry) => entry.weightKg);
+    final minWeight = weights.reduce(math.min).toDouble();
+    final maxWeight = weights.reduce(math.max).toDouble();
+    final yPadding = math.max((maxWeight - minWeight) * 0.15, 0.5).toDouble();
+    final firstDay = DateTime.utc(
+      progress.startDate.year,
+      progress.startDate.month,
+      progress.startDate.day,
+    );
+    final endDay = DateTime.utc(
+      progress.endDate.year,
+      progress.endDate.month,
+      progress.endDate.day,
+    );
+    final maxX = math.max(1, endDay.difference(firstDay).inDays).toDouble();
+    final lineColor = Theme.of(context).colorScheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          key: const ValueKey('body-weight-progress-chart'),
+          height: 220,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: maxX,
+              minY: math.max(0, minWeight - yPadding),
+              maxY: maxWeight + yPadding,
+              lineBarsData: chartSegments
+                  .map(
+                    (segment) => LineChartBarData(
+                      spots: segment.map((index) => spots[index]).toList(),
+                      isCurved: false,
+                      color: lineColor,
+                      barWidth: 2,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: lineColor.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              borderData: FlBorderData(show: false),
+              gridData: const FlGridData(show: true, drawVerticalLine: false),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 42,
+                    getTitlesWidget: (value, meta) => Text(
+                      value.toStringAsFixed(0),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: _progressPeriod == BodyWeightProgressPeriod.weeks
+                        ? 14
+                        : 60,
+                    getTitlesWidget: (value, meta) {
+                      final date = progress.startDate.add(
+                        Duration(days: value.round()),
+                      );
+                      final label =
+                          _progressPeriod == BodyWeightProgressPeriod.weeks
+                          ? DateFormat('d MMM').format(date)
+                          : DateFormat('MMM yy').format(date);
+                      return SideTitleWidget(
+                        meta: meta,
+                        child: Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                    final entryIndex =
+                        chartSegments[spot.barIndex][spot.spotIndex];
+                    final entry = chartEntries[entryIndex];
+                    return LineTooltipItem(
+                      '${DateFormat('d MMM yyyy').format(entry.date)}\n'
+                      '${entry.weightKg.toStringAsFixed(1)} kg',
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Only recorded measurements are plotted. Gaps longer than '
+          '${_progressPeriod == BodyWeightProgressPeriod.weeks ? '14' : '45'} '
+          'days are not connected.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        _buildProgressSummary(progress),
+      ],
+    );
+  }
+
+  /// Splits long gaps so the chart does not imply a continuous trend where
+  /// there has been no recent measurement.
+  List<List<int>> _segmentsForMeasurements(List<FlSpot> spots) {
+    final gapLimit = _progressPeriod == BodyWeightProgressPeriod.weeks
+        ? 14
+        : 45;
+    final segments = <List<int>>[
+      [0],
+    ];
+    for (var index = 1; index < spots.length; index++) {
+      final daysSincePrevious = spots[index].x - spots[index - 1].x;
+      if (daysSincePrevious > gapLimit) {
+        segments.add([index]);
+      } else {
+        segments.last.add(index);
+      }
+    }
+    return segments;
+  }
+
+  Widget _buildProgressSummary(BodyWeightProgress progress) {
+    final first = progress.firstEntry!;
+    final latest = progress.latestEntry!;
+    final change = progress.absoluteChangeKg;
+    final changeText = change == null
+        ? 'Not enough entries to show a change'
+        : change == 0
+        ? 'Absolute change: 0 kg (no change)'
+        : 'Absolute change: ${change.toStringAsFixed(1)} kg '
+              '(${progress.increased ? 'increase' : 'decrease'})';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'First: ${first.weightKg.toStringAsFixed(1)} kg · '
+          '${DateFormat('d MMM yyyy').format(first.date)}',
+          key: const ValueKey('body-weight-first-summary'),
+        ),
+        Text(
+          'Latest: ${latest.weightKg.toStringAsFixed(1)} kg · '
+          '${DateFormat('d MMM yyyy').format(latest.date)}',
+          key: const ValueKey('body-weight-latest-summary'),
+        ),
+        Text(changeText, key: const ValueKey('body-weight-change-summary')),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Weight progress',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<BodyWeightProgressPeriod>(
+                  key: const ValueKey('body-weight-period-selector'),
+                  segments: const [
+                    ButtonSegment(
+                      value: BodyWeightProgressPeriod.weeks,
+                      label: Text('12 weeks'),
+                    ),
+                    ButtonSegment(
+                      value: BodyWeightProgressPeriod.months,
+                      label: Text('12 months'),
+                    ),
+                  ],
+                  selected: {_progressPeriod},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _progressPeriod = selection.first),
+                ),
+                const SizedBox(height: 12),
+                _buildProgressChart(context),
+              ],
+            ),
+          ),
+        ),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
