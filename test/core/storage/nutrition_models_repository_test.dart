@@ -73,6 +73,31 @@ void main() {
     expect(await foodRepository.update(food), isFalse);
   });
 
+  test(
+    'Food repository searches names ignoring case and surrounding spaces',
+    () async {
+      await foodRepository.save(makeFood());
+      await foodRepository.save(
+        Food(
+          name: 'Almond Milk',
+          servingSize: 200,
+          servingUnit: 'ml',
+          caloriesPerServing: 70,
+          proteinGramsPerServing: 2,
+          carbsGramsPerServing: 5,
+          fatGramsPerServing: 3,
+        ),
+      );
+
+      expect(
+        (await foodRepository.searchByName('  MILK ')).map((food) => food.name),
+        ['Almond Milk'],
+      );
+      expect(await foodRepository.searchByName(''), hasLength(2));
+      expect(await foodRepository.searchByName('missing'), isEmpty);
+    },
+  );
+
   test('Meal repository round-trips embedded snapshots and CRUD', () async {
     final id = await mealRepository.save(makeMeal());
     final meal = await mealRepository.getById(id);
@@ -81,6 +106,7 @@ void main() {
     expect(meal?.items, hasLength(2));
     expect(meal?.items.first.foodId, 17);
     expect(meal?.items.first.foodName, 'Oats');
+    expect(meal?.category, 'Breakfast');
     expect(meal?.totalCalories, 350);
     expect(meal?.totalProteinGrams, 33);
     expect(meal?.totalCarbsGrams, 50);
@@ -94,6 +120,26 @@ void main() {
     expect(await mealRepository.getById(id), isNull);
     expect(await mealRepository.delete(id), isFalse);
     expect(await mealRepository.update(meal), isFalse);
+  });
+
+  test('meals without a category remain readable as uncategorized', () async {
+    final id = await mealRepository.save(
+      Meal(
+        name: 'Previously saved meal',
+        consumedAt: DateTime(2026, 11, 12),
+        items: [
+          MealFoodItem(
+            foodName: 'Oats',
+            servingSize: 100,
+            servingUnit: 'g',
+            caloriesPerServing: 200,
+            quantity: 50,
+          ),
+        ],
+      ),
+    );
+
+    expect((await mealRepository.getById(id))?.category, isNull);
   });
 
   test('repository rejects invalid Food and Meal values', () async {
@@ -195,6 +241,7 @@ Food makeFood({double servingSize = 100}) => Food(
 
 Meal makeMeal() => Meal(
   name: 'Breakfast',
+  category: 'Breakfast',
   consumedAt: DateTime(2026, 11, 14, 8, 30),
   items: [
     MealFoodItem(

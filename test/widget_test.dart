@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import 'package:myfitness_journal/core/models/body_weight_entry.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
 import 'package:myfitness_journal/core/models/nutrition_entry.dart';
+import 'package:myfitness_journal/core/models/food.dart';
+import 'package:myfitness_journal/core/models/meal.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/core/models/workout_set.dart';
 
@@ -19,6 +21,8 @@ import 'support/fake_workout_repository.dart';
 import 'support/fake_exercise_library_repository.dart';
 import 'support/fake_body_weight_repository.dart';
 import 'support/fake_nutrition_repository.dart';
+import 'support/fake_food_repository.dart';
+import 'support/fake_meal_repository.dart';
 
 void main() {
   testWidgets('home and existing tabs remain available', (tester) async {
@@ -28,6 +32,8 @@ void main() {
         exerciseLibraryRepository: FakeExerciseLibraryRepository(),
         bodyWeightRepository: FakeBodyWeightRepository(),
         nutritionRepository: FakeNutritionRepository(),
+        foodRepository: FakeFoodRepository(),
+        mealRepository: FakeMealRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -56,6 +62,43 @@ void main() {
       final weightRepository = FakeBodyWeightRepository();
       final nutritionRepository = FakeNutritionRepository();
       final today = DateUtils.dateOnly(DateTime.now());
+      final foodRepository = FakeFoodRepository(
+        foods: [
+          Food(
+            id: 1,
+            name: 'Oats',
+            servingSize: 100,
+            servingUnit: 'g',
+            caloriesPerServing: 200,
+            proteinGramsPerServing: 20,
+            carbsGramsPerServing: 30,
+            fatGramsPerServing: 10,
+          ),
+        ],
+      );
+      final mealRepository = FakeMealRepository(
+        meals: [
+          Meal(
+            id: 1,
+            name: 'Breakfast',
+            category: 'Breakfast',
+            consumedAt: today,
+            items: [
+              MealFoodItem(
+                foodId: 1,
+                foodName: 'Oats',
+                servingSize: 100,
+                servingUnit: 'g',
+                caloriesPerServing: 200,
+                proteinGramsPerServing: 20,
+                carbsGramsPerServing: 30,
+                fatGramsPerServing: 10,
+                quantity: 100,
+              ),
+            ],
+          ),
+        ],
+      );
       await workoutRepository.save(
         Workout(
           date: today,
@@ -80,6 +123,8 @@ void main() {
           exerciseLibraryRepository: FakeExerciseLibraryRepository(),
           bodyWeightRepository: weightRepository,
           nutritionRepository: nutritionRepository,
+          foodRepository: foodRepository,
+          mealRepository: mealRepository,
         ),
       );
       await tester.pumpAndSettle();
@@ -104,7 +149,7 @@ void main() {
       await tester.ensureVisible(
         find.byKey(const ValueKey('dashboard-daily-nutrition')),
       );
-      expect(find.text('350 kcal · 20.0 g protein'), findsOneWidget);
+      expect(find.text('550 kcal · 40.0 g protein'), findsOneWidget);
 
       await tester.ensureVisible(
         find.byKey(const ValueKey('dashboard-open-meals')),

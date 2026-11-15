@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/models/workout.dart';
 import '../../core/models/body_weight_entry.dart';
 import '../../core/models/nutrition_entry.dart';
+import '../../core/models/meal.dart';
 import 'body_weight_statistics.dart';
 import 'nutrition_statistics.dart';
 import 'workout_statistics.dart';
@@ -19,6 +20,7 @@ class DashboardPage extends StatelessWidget {
     required this.isBodyWeightLoading,
     required this.bodyWeightLoadError,
     required this.nutritionEntries,
+    required this.meals,
     required this.isNutritionLoading,
     required this.nutritionLoadError,
     required this.onOpenWorkout,
@@ -36,6 +38,7 @@ class DashboardPage extends StatelessWidget {
   final bool isBodyWeightLoading;
   final bool bodyWeightLoadError;
   final List<NutritionEntry> nutritionEntries;
+  final List<Meal> meals;
   final bool isNutritionLoading;
   final bool nutritionLoadError;
   final VoidCallback onOpenWorkout;
@@ -77,6 +80,7 @@ class DashboardPage extends StatelessWidget {
     final latestWeight = BodyWeightStatistics.latestEntry(bodyWeightEntries);
     final nutritionTotals = NutritionStatisticsCalculator.forDate(
       entries: nutritionEntries,
+      meals: meals,
       date: selectedDate,
     );
 
@@ -267,12 +271,18 @@ class DashboardPage extends StatelessWidget {
               else if (nutritionLoadError)
                 const Text('Nutrition entries could not be loaded.')
               else if (!nutritionEntries.any(
-                (entry) => DateUtils.isSameDay(entry.date, selectedDate),
-              ))
+                    (entry) => DateUtils.isSameDay(entry.date, selectedDate),
+                  ) &&
+                  !meals.any(
+                    (meal) => DateUtils.isSameDay(
+                      meal.consumedAt,
+                      selectedDate,
+                    ),
+                  ))
                 const Text('No nutrition entries for this day.')
               else
                 Text(
-                  '${nutritionTotals.calories} kcal · '
+                  '${_formatNutritionNumber(nutritionTotals.calories)} kcal · '
                   '${nutritionTotals.proteinGrams.toStringAsFixed(1)} g protein',
                   key: const ValueKey('dashboard-daily-nutrition'),
                 ),
@@ -358,4 +368,8 @@ class DashboardPage extends StatelessWidget {
       ],
     );
   }
+
+  String _formatNutritionNumber(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(1);
 }

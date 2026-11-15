@@ -8,6 +8,10 @@ abstract interface class FoodRepository {
   /// Returns all saved foods ordered by name.
   Future<List<Food>> getAll();
 
+  /// Finds foods whose names contain [query], ignoring case and surrounding
+  /// whitespace. An empty query returns all foods.
+  Future<List<Food>> searchByName(String query);
+
   /// Returns the food with [id], or null when it does not exist.
   Future<Food?> getById(int id);
 

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:myfitness_journal/core/models/exercise.dart';
 import 'package:myfitness_journal/core/models/body_weight_entry.dart';
 import 'package:myfitness_journal/core/models/nutrition_entry.dart';
+import 'package:myfitness_journal/core/models/meal.dart';
 import 'package:myfitness_journal/core/models/workout.dart';
 import 'package:myfitness_journal/features/dashboard/dashboard_page.dart';
 
@@ -16,6 +17,7 @@ Widget buildDashboard({
   bool isBodyWeightLoading = false,
   bool bodyWeightLoadError = false,
   List<NutritionEntry> nutritionEntries = const [],
+  List<Meal> meals = const [],
   bool isNutritionLoading = false,
   bool nutritionLoadError = false,
   VoidCallback? onWorkout,
@@ -34,6 +36,7 @@ Widget buildDashboard({
         isBodyWeightLoading: isBodyWeightLoading,
         bodyWeightLoadError: bodyWeightLoadError,
         nutritionEntries: nutritionEntries,
+        meals: meals,
         isNutritionLoading: isNutritionLoading,
         nutritionLoadError: nutritionLoadError,
         onOpenWorkout: onWorkout ?? () {},
@@ -138,6 +141,43 @@ void main() {
       find.byKey(const ValueKey('dashboard-daily-nutrition')),
     );
     expect(find.text('650 kcal · 35.0 g protein'), findsOneWidget);
+  });
+
+  testWidgets('shows Meal totals when there are no legacy entries', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildDashboard(
+        selectedDate: DateTime(2026, 11, 14),
+        meals: [
+          Meal(
+            name: 'Breakfast',
+            category: 'Breakfast',
+            consumedAt: DateTime(2026, 11, 14, 9),
+            items: [
+              MealFoodItem(
+                foodName: 'Oats',
+                servingSize: 100,
+                servingUnit: 'g',
+                caloriesPerServing: 200,
+                proteinGramsPerServing: 20,
+                quantity: 50,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('dashboard-list')),
+      const Offset(0, -1200),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard-daily-nutrition')),
+    );
+    expect(find.text('100 kcal · 10.0 g protein'), findsOneWidget);
   });
 
   testWidgets('counts sessions Monday through Sunday and shows three newest', (

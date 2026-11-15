@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'core/models/workout.dart';
 import 'core/models/body_weight_entry.dart';
 import 'core/models/nutrition_entry.dart';
+import 'core/models/meal.dart';
 import 'core/storage/isar_service.dart';
 import 'core/storage/isar_workout_repository.dart';
 import 'core/storage/workout_repository.dart';
@@ -13,6 +14,10 @@ import 'core/storage/body_weight_repository.dart';
 import 'core/storage/isar_body_weight_repository.dart';
 import 'core/storage/nutrition_repository.dart';
 import 'core/storage/isar_nutrition_repository.dart';
+import 'core/storage/food_repository.dart';
+import 'core/storage/isar_food_repository.dart';
+import 'core/storage/meal_repository.dart';
+import 'core/storage/isar_meal_repository.dart';
 import 'features/dashboard/dashboard_page.dart';
 import 'features/nutrition/nutrition_page.dart';
 import 'features/progress/weight_page.dart';
@@ -34,6 +39,8 @@ Future<void> main() async {
       nutritionRepository: IsarNutritionRepository(
         IsarService.instance.database,
       ),
+      foodRepository: IsarFoodRepository(IsarService.instance.database),
+      mealRepository: IsarMealRepository(IsarService.instance.database),
     ),
   );
 }
@@ -47,6 +54,8 @@ class MyFitnessApp extends StatelessWidget {
     required this.exerciseLibraryRepository,
     required this.bodyWeightRepository,
     required this.nutritionRepository,
+    required this.foodRepository,
+    required this.mealRepository,
     super.key,
   });
 
@@ -61,6 +70,12 @@ class MyFitnessApp extends StatelessWidget {
 
   /// Stores food and meal nutrition entries.
   final NutritionRepository nutritionRepository;
+
+  /// Stores reusable food definitions.
+  final FoodRepository foodRepository;
+
+  /// Stores consumed meals and their food snapshots.
+  final MealRepository mealRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +96,8 @@ class MyFitnessApp extends StatelessWidget {
         exerciseLibraryRepository: exerciseLibraryRepository,
         bodyWeightRepository: bodyWeightRepository,
         nutritionRepository: nutritionRepository,
+        foodRepository: foodRepository,
+        mealRepository: mealRepository,
       ),
     );
   }
@@ -92,6 +109,8 @@ class JournalHome extends StatefulWidget {
     required this.exerciseLibraryRepository,
     required this.bodyWeightRepository,
     required this.nutritionRepository,
+    required this.foodRepository,
+    required this.mealRepository,
     super.key,
   });
 
@@ -102,6 +121,8 @@ class JournalHome extends StatefulWidget {
   final ExerciseLibraryRepository exerciseLibraryRepository;
   final BodyWeightRepository bodyWeightRepository;
   final NutritionRepository nutritionRepository;
+  final FoodRepository foodRepository;
+  final MealRepository mealRepository;
 
   @override
   State<JournalHome> createState() => _JournalHomeState();
@@ -116,6 +137,7 @@ class _JournalHomeState extends State<JournalHome> {
   bool bodyWeightIsLoading = true;
   bool bodyWeightLoadError = false;
   List<NutritionEntry> nutritionEntries = [];
+  List<Meal> meals = [];
   bool nutritionIsLoading = true;
   bool nutritionLoadError = false;
 
@@ -157,6 +179,10 @@ class _JournalHomeState extends State<JournalHome> {
     });
   }
 
+  void _mealsChanged(List<Meal> updatedMeals) {
+    setState(() => meals = updatedMeals);
+  }
+
   void moveDate(int days) {
     setState(() => selectedDate = selectedDate.add(Duration(days: days)));
   }
@@ -180,6 +206,7 @@ class _JournalHomeState extends State<JournalHome> {
     isBodyWeightLoading: bodyWeightIsLoading,
     bodyWeightLoadError: bodyWeightLoadError,
     nutritionEntries: nutritionEntries,
+    meals: meals,
     isNutritionLoading: nutritionIsLoading,
     nutritionLoadError: nutritionLoadError,
     onOpenWorkout: () => setState(() => selectedTab = 1),
@@ -210,8 +237,11 @@ class _JournalHomeState extends State<JournalHome> {
       ),
       NutritionPage(
         repository: widget.nutritionRepository,
+        foodRepository: widget.foodRepository,
+        mealRepository: widget.mealRepository,
         selectedDate: selectedDate,
         onEntriesChanged: _nutritionEntriesChanged,
+        onMealsChanged: _mealsChanged,
         onLoadFinished: _nutritionLoadFinished,
       ),
       WeightPage(

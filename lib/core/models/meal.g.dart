@@ -17,36 +17,41 @@ const MealSchema = CollectionSchema(
   name: r'Meal',
   id: 2462895270179255875,
   properties: {
-    r'consumedAt': PropertySchema(
+    r'category': PropertySchema(
       id: 0,
+      name: r'category',
+      type: IsarType.string,
+    ),
+    r'consumedAt': PropertySchema(
+      id: 1,
       name: r'consumedAt',
       type: IsarType.dateTime,
     ),
     r'items': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'items',
       type: IsarType.objectList,
 
       target: r'MealFoodItem',
     ),
-    r'name': PropertySchema(id: 2, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 3, name: r'name', type: IsarType.string),
     r'totalCalories': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'totalCalories',
       type: IsarType.double,
     ),
     r'totalCarbsGrams': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'totalCarbsGrams',
       type: IsarType.double,
     ),
     r'totalFatGrams': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'totalFatGrams',
       type: IsarType.double,
     ),
     r'totalProteinGrams': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'totalProteinGrams',
       type: IsarType.double,
     ),
@@ -73,6 +78,12 @@ int _mealEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  {
+    final value = object.category;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.items.length * 3;
   {
     final offsets = allOffsets[MealFoodItem]!;
@@ -91,18 +102,19 @@ void _mealSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.consumedAt);
+  writer.writeString(offsets[0], object.category);
+  writer.writeDateTime(offsets[1], object.consumedAt);
   writer.writeObjectList<MealFoodItem>(
-    offsets[1],
+    offsets[2],
     allOffsets,
     MealFoodItemSchema.serialize,
     object.items,
   );
-  writer.writeString(offsets[2], object.name);
-  writer.writeDouble(offsets[3], object.totalCalories);
-  writer.writeDouble(offsets[4], object.totalCarbsGrams);
-  writer.writeDouble(offsets[5], object.totalFatGrams);
-  writer.writeDouble(offsets[6], object.totalProteinGrams);
+  writer.writeString(offsets[3], object.name);
+  writer.writeDouble(offsets[4], object.totalCalories);
+  writer.writeDouble(offsets[5], object.totalCarbsGrams);
+  writer.writeDouble(offsets[6], object.totalFatGrams);
+  writer.writeDouble(offsets[7], object.totalProteinGrams);
 }
 
 Meal _mealDeserialize(
@@ -112,17 +124,18 @@ Meal _mealDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Meal(
-    consumedAt: reader.readDateTime(offsets[0]),
+    category: reader.readStringOrNull(offsets[0]),
+    consumedAt: reader.readDateTime(offsets[1]),
     id: id,
     items:
         reader.readObjectList<MealFoodItem>(
-          offsets[1],
+          offsets[2],
           MealFoodItemSchema.deserialize,
           allOffsets,
           MealFoodItem(),
         ) ??
         const [],
-    name: reader.readString(offsets[2]),
+    name: reader.readString(offsets[3]),
   );
   return object;
 }
@@ -135,8 +148,10 @@ P _mealDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
+      return (reader.readDateTime(offset)) as P;
+    case 2:
       return (reader.readObjectList<MealFoodItem>(
                 offset,
                 MealFoodItemSchema.deserialize,
@@ -145,15 +160,15 @@ P _mealDeserializeProp<P>(
               ) ??
               const [])
           as P;
-    case 2:
-      return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
       return (reader.readDouble(offset)) as P;
     case 6:
+      return (reader.readDouble(offset)) as P;
+    case 7:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -251,6 +266,168 @@ extension MealQueryWhere on QueryBuilder<Meal, Meal, QWhereClause> {
 }
 
 extension MealQueryFilter on QueryBuilder<Meal, Meal, QFilterCondition> {
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'category'),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'category'),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'category',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'category',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'category',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'category', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterFilterCondition> categoryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'category', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<Meal, Meal, QAfterFilterCondition> consumedAtEqualTo(
     DateTime value,
   ) {
@@ -878,6 +1055,18 @@ extension MealQueryObject on QueryBuilder<Meal, Meal, QFilterCondition> {
 extension MealQueryLinks on QueryBuilder<Meal, Meal, QFilterCondition> {}
 
 extension MealQuerySortBy on QueryBuilder<Meal, Meal, QSortBy> {
+  QueryBuilder<Meal, Meal, QAfterSortBy> sortByCategory() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'category', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterSortBy> sortByCategoryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'category', Sort.desc);
+    });
+  }
+
   QueryBuilder<Meal, Meal, QAfterSortBy> sortByConsumedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'consumedAt', Sort.asc);
@@ -952,6 +1141,18 @@ extension MealQuerySortBy on QueryBuilder<Meal, Meal, QSortBy> {
 }
 
 extension MealQuerySortThenBy on QueryBuilder<Meal, Meal, QSortThenBy> {
+  QueryBuilder<Meal, Meal, QAfterSortBy> thenByCategory() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'category', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Meal, Meal, QAfterSortBy> thenByCategoryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'category', Sort.desc);
+    });
+  }
+
   QueryBuilder<Meal, Meal, QAfterSortBy> thenByConsumedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'consumedAt', Sort.asc);
@@ -1038,6 +1239,14 @@ extension MealQuerySortThenBy on QueryBuilder<Meal, Meal, QSortThenBy> {
 }
 
 extension MealQueryWhereDistinct on QueryBuilder<Meal, Meal, QDistinct> {
+  QueryBuilder<Meal, Meal, QDistinct> distinctByCategory({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'category', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Meal, Meal, QDistinct> distinctByConsumedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'consumedAt');
@@ -1081,6 +1290,12 @@ extension MealQueryProperty on QueryBuilder<Meal, Meal, QQueryProperty> {
   QueryBuilder<Meal, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Meal, String?, QQueryOperations> categoryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'category');
     });
   }
 
