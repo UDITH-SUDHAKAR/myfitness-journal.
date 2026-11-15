@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/auth/auth_controller.dart';
+import 'core/auth/auth_repository.dart';
+import 'core/auth/google_sign_in_gateway.dart';
+import 'core/auth/supabase_auth_repository.dart';
 import 'core/models/workout.dart';
 import 'core/models/body_weight_entry.dart';
 import 'core/models/nutrition_entry.dart';
@@ -19,6 +24,8 @@ import 'core/storage/isar_food_repository.dart';
 import 'core/storage/meal_repository.dart';
 import 'core/storage/isar_meal_repository.dart';
 import 'features/dashboard/dashboard_page.dart';
+import 'features/auth/account_dialog.dart';
+import 'features/auth/authentication_gate.dart';
 import 'features/nutrition/nutrition_page.dart';
 import 'features/progress/weight_page.dart';
 import 'features/workouts/workout_page.dart';
@@ -26,21 +33,44 @@ import 'features/workouts/workout_statistics_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await IsarService.instance.initialize();
+  final supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  final publishableKey = const String.fromEnvironment(
+    'SUPABASE_PUBLISHABLE_KEY',
+  );
+  final googleWebClientId = const String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+  );
+
+  AuthRepository? authRepository;
+  String? authUnavailableMessage;
+  if (supabaseUrl.isEmpty || publishableKey.isEmpty) {
+    authUnavailableMessage =
+        'Supabase is not configured. Continue offline to use the journal.';
+  } else {
+    try {
+      final supabase = await Supabase.initialize(
+        url: supabaseUrl,
+        publishableKey: publishableKey,
+      );
+      authRepository = SupabaseAuthRepository(
+        client: supabase.client,
+        googleSignIn: NativeGoogleSignInGateway(
+          serverClientId: googleWebClientId,
+        ),
+      );
+    } catch (_) {
+      authUnavailableMessage =
+          'Supabase could not be initialized. Continue offline to use the journal.';
+    }
+  }
+
   runApp(
-    MyFitnessApp(
-      workoutRepository: IsarWorkoutRepository(IsarService.instance.database),
-      exerciseLibraryRepository: IsarExerciseLibraryRepository(
-        IsarService.instance.database,
+    MyFitnessApp.authenticated(
+      authController: AuthController(
+        repository: authRepository,
+        unavailableMessage: authUnavailableMessage,
       ),
-      bodyWeightRepository: IsarBodyWeightRepository(
-        IsarService.instance.database,
-      ),
-      nutritionRepository: IsarNutritionRepository(
-        IsarService.instance.database,
-      ),
-      foodRepository: IsarFoodRepository(IsarService.instance.database),
-      mealRepository: IsarMealRepository(IsarService.instance.database),
+      isarService: IsarService.instance,
     ),
   );
 }
@@ -57,25 +87,43 @@ class MyFitnessApp extends StatelessWidget {
     required this.foodRepository,
     required this.mealRepository,
     super.key,
-  });
+  }) : authController = null,
+       isarService = null;
+
+  const MyFitnessApp.authenticated({
+    required this.authController,
+    required this.isarService,
+    super.key,
+  }) : workoutRepository = null,
+       exerciseLibraryRepository = null,
+       bodyWeightRepository = null,
+       nutritionRepository = null,
+       foodRepository = null,
+       mealRepository = null;
 
   /// Repository shared by the workout UI.
-  final WorkoutRepository workoutRepository;
+  final WorkoutRepository? workoutRepository;
 
   /// Repository shared by the exercise library and workout editor.
-  final ExerciseLibraryRepository exerciseLibraryRepository;
+  final ExerciseLibraryRepository? exerciseLibraryRepository;
 
   /// Stores daily body-weight entries.
-  final BodyWeightRepository bodyWeightRepository;
+  final BodyWeightRepository? bodyWeightRepository;
 
   /// Stores food and meal nutrition entries.
-  final NutritionRepository nutritionRepository;
+  final NutritionRepository? nutritionRepository;
 
   /// Stores reusable food definitions.
-  final FoodRepository foodRepository;
+  final FoodRepository? foodRepository;
 
   /// Stores consumed meals and their food snapshots.
-  final MealRepository mealRepository;
+  final MealRepository? mealRepository;
+
+  /// Coordinates session state in the production app.
+  final AuthController? authController;
+
+  /// Opens offline and account-specific local databases.
+  final IsarService? isarService;
 
   @override
   Widget build(BuildContext context) {
@@ -91,14 +139,43 @@ class MyFitnessApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: JournalHome(
-        workoutRepository: workoutRepository,
-        exerciseLibraryRepository: exerciseLibraryRepository,
-        bodyWeightRepository: bodyWeightRepository,
-        nutritionRepository: nutritionRepository,
-        foodRepository: foodRepository,
-        mealRepository: mealRepository,
-      ),
+      home: authController != null
+          ? AuthenticationGate(
+              controller: authController!,
+              journalBuilder: (userId) => _buildJournal(
+                controller: authController!,
+                isarService: isarService!,
+                userId: userId,
+              ),
+            )
+          : JournalHome(
+              workoutRepository: workoutRepository!,
+              exerciseLibraryRepository: exerciseLibraryRepository!,
+              bodyWeightRepository: bodyWeightRepository!,
+              nutritionRepository: nutritionRepository!,
+              foodRepository: foodRepository!,
+              mealRepository: mealRepository!,
+            ),
+    );
+  }
+
+  Future<Widget> _buildJournal({
+    required AuthController controller,
+    required IsarService isarService,
+    required String? userId,
+  }) async {
+    final database = userId == null
+        ? await isarService.openOffline()
+        : await isarService.openForUser(userId);
+    return JournalHome(
+      key: ValueKey(userId ?? 'offline-journal'),
+      workoutRepository: IsarWorkoutRepository(database),
+      exerciseLibraryRepository: IsarExerciseLibraryRepository(database),
+      bodyWeightRepository: IsarBodyWeightRepository(database),
+      nutritionRepository: IsarNutritionRepository(database),
+      foodRepository: IsarFoodRepository(database),
+      mealRepository: IsarMealRepository(database),
+      authController: controller,
     );
   }
 }
@@ -111,6 +188,7 @@ class JournalHome extends StatefulWidget {
     required this.nutritionRepository,
     required this.foodRepository,
     required this.mealRepository,
+    this.authController,
     super.key,
   });
 
@@ -123,6 +201,9 @@ class JournalHome extends StatefulWidget {
   final NutritionRepository nutritionRepository;
   final FoodRepository foodRepository;
   final MealRepository mealRepository;
+
+  /// Enables profile and logout controls when authentication is configured.
+  final AuthController? authController;
 
   @override
   State<JournalHome> createState() => _JournalHomeState();
@@ -259,6 +340,13 @@ class _JournalHomeState extends State<JournalHome> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          if (widget.authController != null)
+            IconButton(
+              key: const ValueKey('journal-account-button'),
+              tooltip: 'Account',
+              onPressed: _showAccount,
+              icon: const Icon(Icons.account_circle_outlined),
+            ),
           IconButton(
             onPressed: () => moveDate(-1),
             icon: const Icon(Icons.chevron_left),
@@ -312,6 +400,15 @@ class _JournalHomeState extends State<JournalHome> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showAccount() async {
+    final controller = widget.authController;
+    if (controller == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AccountDialog(controller: controller),
     );
   }
 }
